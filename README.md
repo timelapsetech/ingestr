@@ -2,7 +2,7 @@
 
 A modern macOS application for ingesting and organizing image sequences. Ingestr automatically organizes your images into date-based folders and handles sequence detection and naming.
 
-![Ingestr Application](Resources/app_screenshot.png)
+![Ingestr Application](Ingestr/Resources/app_screenshot.png)
 
 ## Features
 
