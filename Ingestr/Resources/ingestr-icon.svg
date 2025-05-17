@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background with rounded corners -->
+  <rect x="0" y="0" width="512" height="512" rx="128" ry="128" fill="#121212"/>
+  
+  <!-- Subtle gradient overlay -->
+  <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#252525" stop-opacity="0.6"/>
+    <stop offset="100%" stop-color="#000000" stop-opacity="0.8"/>
+  </linearGradient>
+  <rect x="0" y="0" width="512" height="512" rx="128" ry="128" fill="url(#bg-gradient)"/>
+  
+  <!-- Subtle inner shadow effect -->
+  <rect x="24" y="24" width="464" height="464" rx="112" ry="112" fill="none" stroke="#000000" stroke-width="6" filter="blur(3px)"/>
+  
+  <!-- macOS style folder icon in light blue -->
+  <g opacity="0.3">
+    <!-- Folder gradient -->
+    <linearGradient id="folder-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7BBDFF"/>
+      <stop offset="100%" stop-color="#4A9CFF"/>
+    </linearGradient>
+    
+    <!-- Folder back with rounded corners -->
+    <path d="M120,135 C120,125 128,115 138,115 L184,115 C194,115 200,118 205,125 L220,145 C225,152 231,155 241,155 L374,155 C384,155 392,165 392,175 L392,365 C392,375 384,385 374,385 L138,385 C128,385 120,375 120,365 L120,135 Z" fill="url(#folder-gradient)" rx="10" ry="10"/>
+    
+    <!-- Folder front edge shading -->
+    <path d="M120,155 L392,155 L392,365 C392,375 384,385 374,385 L138,385 C128,385 120,375 120,365 L120,155 Z" fill="#5AA5FF" opacity="0.9" rx="10" ry="10"/>
+    
+    <!-- Folder shine effect -->
+    <path d="M120,155 L392,155 L392,180 L120,180 Z" fill="#90CAFF" opacity="0.6"/>
+  </g>
+  
+  <!-- Clean Capital "I" shape with no arrow elements -->
+  <g transform="translate(256, 256)">
+    <!-- Bottom horizontal bar of "I" -->
+    <rect x="-80" y="120" width="160" height="40" rx="12" ry="12" fill="#FFFFFF"/>
+    
+    <!-- Top horizontal bar of "I" - completely flat with no arrow hints -->
+    <rect x="-80" y="-160" width="160" height="40" rx="12" ry="12" fill="#FFFFFF"/>
+    
+    <!-- Vertical stem of "I" -->
+    <rect x="-30" y="-120" width="60" height="240" fill="#FFFFFF"/>
+    
+    <!-- Subtle highlight effect -->
+    <rect x="-30" y="-120" width="20" height="240" fill="#F0F0F0" opacity="0.6"/>
+    
+    <!-- Subtle shadow effect -->
+    <rect x="0" y="-120" width="30" height="240" fill="#DDDDDD" opacity="0.8"/>
+  </g>
+  
+  <!-- Subtle glow effect -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#FFFFFF" stroke-width="5" opacity="0.1" filter="blur(20px)"/>
+</svg>
