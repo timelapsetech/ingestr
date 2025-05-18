@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -17,6 +17,16 @@
 		C28C9AA32DD8181C003101EA /* RenameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28C9AA22DD8181C003101EA /* RenameViewModel.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C26BE6EB2DDA924900F71594 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A1A1A1A1A1A1A1A1A1A1A31 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1A1A1A1A1A1A1A1A1A1A1A2D;
+			remoteInfo = Ingestr;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		1A1A1A1A1A1A1A1A1A1A1A1B /* IngestrApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestrApp.swift; sourceTree = "<group>"; };
 		1A1A1A1A1A1A1A1A1A1A1A1D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -28,12 +38,24 @@
 		1A1A1A1A1A1A1A1A1A1A1A41 /* Ingestr.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = Ingestr.icns; sourceTree = "<group>"; };
 		1A1A1A1A1A1A1A1A1A1A1A43 /* icon_generator.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = icon_generator.py; sourceTree = "<group>"; };
 		1A1A1A1A1A1A1A1A1A1A1A47 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C26BE6E72DDA924800F71594 /* IngestrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IngestrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C28C9AA22DD8181C003101EA /* RenameViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenameViewModel.swift; sourceTree = "<group>"; };
 		C28C9AA42DD81EBC003101EA /* IngestrRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IngestrRelease.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		C26BE6E82DDA924900F71594 /* IngestrTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = IngestrTests; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		1A1A1A1A1A1A1A1A1A1A1A27 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C26BE6E42DDA924800F71594 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -47,6 +69,7 @@
 			isa = PBXGroup;
 			children = (
 				1A1A1A1A1A1A1A1A1A1A1A29 /* Ingestr */,
+				C26BE6E82DDA924900F71594 /* IngestrTests */,
 				1A1A1A1A1A1A1A1A1A1A1A2A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -71,6 +94,7 @@
 			isa = PBXGroup;
 			children = (
 				1A1A1A1A1A1A1A1A1A1A1A26 /* Ingestr.app */,
+				C26BE6E72DDA924800F71594 /* IngestrTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -129,6 +153,29 @@
 			productReference = 1A1A1A1A1A1A1A1A1A1A1A26 /* Ingestr.app */;
 			productType = "com.apple.product-type.application";
 		};
+		C26BE6E62DDA924800F71594 /* IngestrTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C26BE6EF2DDA924900F71594 /* Build configuration list for PBXNativeTarget "IngestrTests" */;
+			buildPhases = (
+				C26BE6E32DDA924800F71594 /* Sources */,
+				C26BE6E42DDA924800F71594 /* Frameworks */,
+				C26BE6E52DDA924800F71594 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C26BE6EC2DDA924900F71594 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C26BE6E82DDA924900F71594 /* IngestrTests */,
+			);
+			name = IngestrTests;
+			packageProductDependencies = (
+			);
+			productName = IngestrTests;
+			productReference = C26BE6E72DDA924800F71594 /* IngestrTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -136,11 +183,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1500;
+				LastSwiftUpdateCheck = 1630;
 				LastUpgradeCheck = 1630;
 				TargetAttributes = {
 					1A1A1A1A1A1A1A1A1A1A1A2D = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					C26BE6E62DDA924800F71594 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 1A1A1A1A1A1A1A1A1A1A1A2D;
 					};
 				};
 			};
@@ -158,6 +209,7 @@
 			projectRoot = "";
 			targets = (
 				1A1A1A1A1A1A1A1A1A1A1A2D /* Ingestr */,
+				C26BE6E62DDA924800F71594 /* IngestrTests */,
 			);
 		};
 /* End PBXProject section */
@@ -169,6 +221,13 @@
 			files = (
 				1A1A1A1A1A1A1A1A1A1A1A40 /* Ingestr.icns in Resources */,
 				1A1A1A1A1A1A1A1A1A1A1A46 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C26BE6E52DDA924800F71594 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,7 +247,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C26BE6E32DDA924800F71594 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C26BE6EC2DDA924900F71594 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1A1A1A1A1A1A1A1A1A1A1A2D /* Ingestr */;
+			targetProxy = C26BE6EB2DDA924900F71594 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1A1A1A1A1A1A1A1A1A1A1A33 /* Debug */ = {
@@ -326,6 +400,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 2D8MBBQWXH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Ingestr/Info.plist;
@@ -336,8 +411,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetechnologies.ingestr;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetech.ingestr;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -369,12 +444,48 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetechnologies.ingestr;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetech.ingestr;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		C26BE6ED2DDA924900F71594 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2D8MBBQWXH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.3;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetech.IngestrTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ingestr.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Ingestr";
+			};
+			name = Debug;
+		};
+		C26BE6EE2DDA924900F71594 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2D8MBBQWXH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.3;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetech.IngestrTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ingestr.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Ingestr";
 			};
 			name = Release;
 		};
@@ -395,6 +506,15 @@
 			buildConfigurations = (
 				1A1A1A1A1A1A1A1A1A1A1A33 /* Debug */,
 				1A1A1A1A1A1A1A1A1A1A1A34 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C26BE6EF2DDA924900F71594 /* Build configuration list for PBXNativeTarget "IngestrTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C26BE6ED2DDA924900F71594 /* Debug */,
+				C26BE6EE2DDA924900F71594 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

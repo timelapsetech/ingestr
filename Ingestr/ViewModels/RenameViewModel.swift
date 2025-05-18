@@ -35,6 +35,7 @@ class RenameViewModel: ObservableObject {
     @Published var shouldResetSourceURL: Bool = false
     @Published var autoRename: Bool = false
     @Published var autoSplit: Bool = false
+    @Published var addToExisting: Bool = false
     @Published var showCompletionAlert: Bool = false
     @Published var completionMessage: String = ""
     @Published var completionFolderURL: URL?
@@ -118,6 +119,37 @@ class RenameViewModel: ObservableObject {
             return true
         }
         return false
+    }
+    
+    // Improved: Find last sequence number for files matching 'basename + zero-padded number + .ext'
+    func findLastSequenceNumber(in folderURL: URL, baseName: String) -> (lastNumber: Int, padding: Int)? {
+        do {
+            let fileManager = FileManager.default
+            let contents = try fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil)
+            // Match files like baseName + zero-padded number + .ext (e.g., 200704161CO_0599.jpg)
+            let regexPattern = "^" + NSRegularExpression.escapedPattern(for: baseName) + "(\\d+)\\.[^.]+$"
+            let regex = try NSRegularExpression(pattern: regexPattern)
+            var maxNumber = 0
+            var maxPadding = 0
+            for url in contents {
+                let fileName = url.lastPathComponent
+                if let match = regex.firstMatch(in: fileName, range: NSRange(location: 0, length: fileName.utf16.count)),
+                   let numberRange = Range(match.range(at: 1), in: fileName) {
+                    let numberStr = String(fileName[numberRange])
+                    if let number = Int(numberStr) {
+                        if number > maxNumber {
+                            maxNumber = number
+                            maxPadding = numberStr.count
+                        }
+                    }
+                }
+            }
+            if maxNumber == 0 { return nil }
+            return (maxNumber, maxPadding)
+        } catch {
+            print("Error finding last sequence number: \(error)")
+            return nil
+        }
     }
     
     private func getNextSequenceNumber(for date: Date, in outputURL: URL) -> Int {
@@ -243,69 +275,25 @@ class RenameViewModel: ObservableObject {
                 }
                 
                 // Process each sequence
-                for sequenceIndex in 0..<sequenceBreaks.count {
-                    let startIndex = sequenceBreaks[sequenceIndex]
-                    let endIndex = sequenceIndex < sequenceBreaks.count - 1 ? sequenceBreaks[sequenceIndex + 1] : filesToProcess.count
+                for i in 0..<sequenceBreaks.count {
+                    if Task.isCancelled { break }
+                    
+                    let startIndex = sequenceBreaks[i]
+                    let endIndex = i < sequenceBreaks.count - 1 ? sequenceBreaks[i + 1] : filesToProcess.count
                     let sequenceFiles = Array(filesToProcess[startIndex..<endIndex])
                     
-                    // Check if this is a small sequence
+                    // Skip small sequences
                     if sequenceFiles.count < minSequenceSize {
-                        // Move files to extras folder
-                        let year = Calendar.current.component(.year, from: sequenceFiles[0].date)
-                        let extrasFolder = outputURL.appendingPathComponent("\(year)/Extras")
-                        try fileManager.createDirectory(at: extrasFolder, withIntermediateDirectories: true)
-                        
-                        for fileInfo in sequenceFiles {
-                            let fileURL = fileInfo.url
-                            let fileDate = fileInfo.date
-                            let formatter = DateFormatter()
-                            formatter.dateFormat = "yyyyMMdd-HHmmss"
-                            let newName = formatter.string(from: fileDate) + "." + fileURL.pathExtension
-                            let destinationURL = extrasFolder.appendingPathComponent(newName)
-                            try fileManager.copyItem(at: fileURL, to: destinationURL)
-                        }
                         hasExtras = true
                         continue
                     }
                     
-                    // Get sequence number for this group
-                    var sequenceNumber = 1
-                    var effectiveBasename = basename
-                    if autoRename {
-                        let firstFileDate = sequenceFiles[0].date
-                        sequenceNumber = getNextSequenceNumber(for: firstFileDate, in: outputURL)
-                        let formatter = DateFormatter()
-                        formatter.dateFormat = "yyyyMMdd"
-                        effectiveBasename = formatter.string(from: firstFileDate) + "\(sequenceNumber)CO_"
-                        
-                        // Store the first year we process
-                        if firstYear == nil {
-                            firstYear = Calendar.current.component(.year, from: firstFileDate)
-                        }
-                    }
+                    try await processSequence(sequenceFiles, in: outputURL)
+                    processedFiles += sequenceFiles.count
                     
-                    // Process files in this sequence
-                    var currentNumber = startNumber
-                    for (index, fileInfo) in sequenceFiles.enumerated() {
-                        if Task.isCancelled { break }
-                        let fileURL = fileInfo.url
-                        let fileDate = fileInfo.date
-                        let year = Calendar.current.component(.year, from: fileDate)
-                        let baseFolder = effectiveBasename.hasSuffix("_") ? String(effectiveBasename.dropLast()) : effectiveBasename
-                        let yearFolder = outputURL.appendingPathComponent("\(year)")
-                        let baseFolderURL = yearFolder.appendingPathComponent(baseFolder)
-                        try fileManager.createDirectory(at: baseFolderURL, withIntermediateDirectories: true)
-                        let paddedNumber = String(format: "%0\(numberPadding)d", currentNumber)
-                        let fileExtension = fileURL.pathExtension
-                        let newName = "\(effectiveBasename)\(paddedNumber).\(fileExtension)"
-                        let destinationURL = baseFolderURL.appendingPathComponent(newName)
-                        try fileManager.copyItem(at: fileURL, to: destinationURL)
-                        currentNumber += 1
-                        processedFiles += 1
-                        let progressValue = min(Double(processedFiles) / Double(totalFiles), 1.0)
-                        await MainActor.run {
-                            progress = progressValue
-                        }
+                    let progressValue = min(Double(processedFiles) / Double(totalFiles), 1.0)
+                    await MainActor.run {
+                        progress = progressValue
                     }
                 }
                 
@@ -361,7 +349,7 @@ class RenameViewModel: ObservableObject {
     }
     
     // SEQUENTIAL NAMING LOGIC
-    private func generateNewSequentialName(currentNumber: Int, fileURL: URL) -> String {
+    func generateNewSequentialName(currentNumber: Int, fileURL: URL) -> String {
         let paddedNumber = String(format: "%0\(numberPadding)d", currentNumber)
         let fileExtension = fileURL.pathExtension
         
@@ -554,6 +542,65 @@ class RenameViewModel: ObservableObject {
     func openCompletionFolder() {
         if let url = completionFolderURL {
             NSWorkspace.shared.open(url)
+        }
+    }
+    
+    // Handles copying and numbering for a sequence, supporting addToExisting logic
+    private func processSequence(_ sequenceFiles: [(url: URL, date: Date)], in outputURL: URL) async throws {
+        let fileManager = FileManager.default
+        var effectiveBasename = basename
+        var sequenceNumber = 1
+        var effectivePadding = numberPadding
+        var currentNumber = startNumber
+        var sequenceFolderURL: URL? = nil
+
+        if autoRename {
+            let firstFileDate = sequenceFiles[0].date
+            sequenceNumber = getNextSequenceNumber(for: firstFileDate, in: outputURL)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyyMMdd"
+            // Always add underscore after CO for autoRename
+            effectiveBasename = formatter.string(from: firstFileDate) + "\(sequenceNumber)CO_"
+        }
+
+        // If adding to existing, find the last number and padding
+        if addToExisting {
+            let year = Calendar.current.component(.year, from: sequenceFiles[0].date)
+            let yearFolder = outputURL.appendingPathComponent("\(year)")
+            let baseFolder = effectiveBasename.hasSuffix("_") ? String(effectiveBasename.dropLast()) : effectiveBasename
+            let baseFolderURL = yearFolder.appendingPathComponent(baseFolder)
+            // Always use baseName with trailing underscore for matching
+            let matchBaseName = effectiveBasename.hasSuffix("_") ? effectiveBasename : effectiveBasename + "_"
+            if let existingInfo = findLastSequenceNumber(in: baseFolderURL, baseName: matchBaseName) {
+                currentNumber = existingInfo.lastNumber + 1
+                effectivePadding = existingInfo.padding
+            }
+        }
+
+        for (idx, fileInfo) in sequenceFiles.enumerated() {
+            if Task.isCancelled { break }
+            let fileURL = fileInfo.url
+            let fileDate = fileInfo.date
+            let year = Calendar.current.component(.year, from: fileDate)
+            let baseFolder = effectiveBasename.hasSuffix("_") ? String(effectiveBasename.dropLast()) : effectiveBasename
+            let yearFolder = outputURL.appendingPathComponent("\(year)")
+            let baseFolderURL = yearFolder.appendingPathComponent(baseFolder)
+            try fileManager.createDirectory(at: baseFolderURL, withIntermediateDirectories: true)
+            // Always ensure underscore is present
+            let baseNameWithUnderscore = effectiveBasename.hasSuffix("_") ? effectiveBasename : effectiveBasename + "_"
+            let paddedNumber = String(format: "%0\(effectivePadding)d", currentNumber)
+            let fileExtension = fileURL.pathExtension
+            let newName = "\(baseNameWithUnderscore)\(paddedNumber).\(fileExtension)"
+            let destinationURL = baseFolderURL.appendingPathComponent(newName)
+            try fileManager.copyItem(at: fileURL, to: destinationURL)
+            currentNumber += 1
+            if idx == 0 { sequenceFolderURL = baseFolderURL }
+        }
+        // Set the completion folder to the sequence folder if available
+        if let folder = sequenceFolderURL {
+            await MainActor.run {
+                self.completionFolderURL = folder
+            }
         }
     }
     

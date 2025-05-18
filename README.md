@@ -14,6 +14,7 @@ A modern macOS application for ingesting and organizing image sequences. Ingestr
 - **File Extension Filtering**: Filter files by extension (e.g., "jpg", "raw")
 - **Progress Tracking**: Real-time progress monitoring for large batches
 - **Dark/Light Mode Support**: Automatically adapts to your macOS appearance settings
+- **Add to Existing**: When enabled, the app will detect the last number in an existing image sequence in the destination and continue numbering from there, matching the zero-padding of existing files. This is useful for appending new images to an already-ingested sequence without overwriting or duplicating numbers.
 
 ## Why this exists
 
@@ -77,6 +78,9 @@ If you have the same or similar needs, this app might be useful to you. If so, e
 - Choose which number to start the sequence from
 - Useful when continuing a previous sequence
 
+#### Add to Existing
+- When enabled, the app will scan the destination for existing files matching the base name and continue numbering from the next available number, matching the existing zero-padding. This ensures new images are appended to the sequence seamlessly.
+
 ### Output Structure
 
 The app creates the following folder structure:
@@ -113,6 +117,9 @@ After ingesting completes:
 ### Requirements
 - Xcode 14.0 or later
 - Swift 5.5+
+
+### Testing
+- The project now includes automated unit tests for sequence detection, filename generation, and add-to-existing logic. Run tests with Cmd+U in Xcode to ensure continued reliability after changes.
 
 ## Credits
 

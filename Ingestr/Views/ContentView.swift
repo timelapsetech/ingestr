@@ -55,6 +55,10 @@ struct ContentView: View {
                         .padding(.bottom, 5)
                         .disabled(!viewModel.autoRename)
 
+                    // Add to Existing Toggle
+                    Toggle("Add to Existing", isOn: $viewModel.addToExisting)
+                        .padding(.bottom, 5)
+
                     // Base Name
                     VStack(alignment: .leading) {
                         HStack {
