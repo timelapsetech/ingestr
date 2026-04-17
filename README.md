@@ -2,6 +2,8 @@
 
 A modern macOS application for ingesting and organizing image sequences. Ingestr automatically organizes your images into date-based folders and handles sequence detection and naming.
 
+**Current release:** 1.2 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
+
 ![Ingestr Application](Ingestr/Resources/app_screenshot.png)
 
 ## Features
@@ -30,10 +32,19 @@ If you have the same or similar needs, this app might be useful to you. If so, e
 
 ## Installation
 
-1. Download the latest release from the [Releases](https://github.com/timelapsetech/ingestr/releases) page
+1. Download the latest release from the [Releases](https://github.com/timelapsetech/ingestr/releases) page (use the release asset that contains `Ingestr.app`, not the “Source code” zip, which is only the repository and must be built in Xcode).
 2. Drag `Ingestr.app` to your Applications folder
 3. Launch from Applications or Spotlight
 4. When prompted, grant the app permission to access your files and photos
+
+### macOS “malware” or “can’t be opened” (Gatekeeper)
+
+Downloads are marked as quarantined. If the app is not **Developer ID** signed and **notarized**, macOS may say it cannot verify the app or that it may harm your Mac. That is Gatekeeper, not a virus scan of the project.
+
+- **First launch:** Control-click (right-click) `Ingestr.app`, choose **Open**, then confirm **Open** in the dialog. After that, double-click works normally.
+- **Alternatively:** System Settings → Privacy & Security → scroll to the message about the app and click **Open Anyway** (wording varies by macOS version).
+
+For distribution without that prompt, maintainers should archive with a **Developer ID** certificate and **notarize** the app with Apple before uploading the zip to Releases.
 
 ## Usage
 

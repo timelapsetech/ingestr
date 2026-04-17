@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -29,6 +30,8 @@ class RenameViewModel: ObservableObject {
     @Published var startNumber: Int = 1
     @Published var isProcessing: Bool = false
     @Published var progress: Double = 0
+    /// Current step description, e.g. "Reading metadata 4 / 1200: IMG_001.jpg"
+    @Published var progressDetail: String = ""
     @Published var isSourceTargeted: Bool = false
     @Published var isOutputTargeted: Bool = false
     @Published var extensionFilter: String = ""
@@ -44,6 +47,9 @@ class RenameViewModel: ObservableObject {
     private let defaultGapThreshold: TimeInterval = 60 // 1 minute
     private let minImagesForGapDetection: Int = 3 // Minimum images needed to detect normal interval
     private let minSequenceSize: Int = 10 // Minimum number of images to consider a sequence
+    /// Share of the bar used while reading EXIF/metadata (rest is copy).
+    private static let metadataProgressWeight: Double = 0.38
+    private static var copyProgressWeight: Double { 1.0 - metadataProgressWeight }
     
     // Rename mode
     @Published var sequentialMode: Bool = true
@@ -69,7 +75,7 @@ class RenameViewModel: ObservableObject {
     private var usedRandomNames = Set<String>()
     
     var canStartRenaming: Bool {
-        sourceURL != nil && outputURL != nil
+        sourceURL != nil && outputURL != nil && !isProcessing
     }
     
     func selectPreset(_ key: String) {
@@ -119,6 +125,36 @@ class RenameViewModel: ObservableObject {
             return true
         }
         return false
+    }
+    
+    func selectSourceFolder() {
+        presentFolderPicker { self.sourceURL = $0 }
+    }
+    
+    func selectOutputFolder() {
+        presentFolderPicker { self.outputURL = $0 }
+    }
+    
+    private func presentFolderPicker(onPicked: @escaping (URL) -> Void) {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Folder"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        
+        let finish: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let url = panel.url else { return }
+            DispatchQueue.main.async {
+                onPicked(url)
+            }
+        }
+        
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            panel.begin(completionHandler: finish)
+        }
     }
     
     // Improved: Find last sequence number for files matching 'basename + zero-padded number + .ext'
@@ -233,48 +269,90 @@ class RenameViewModel: ObservableObject {
         guard let sourceURL = sourceURL, let outputURL = outputURL else { return }
         isProcessing = true
         progress = 0
-        currentOperation = Task {
+        progressDetail = "Listing files…"
+        // Run off the main actor so enumeration and copies don't block UI updates (ProgressView would stay at 0%).
+        currentOperation = Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            let accessingSource = sourceURL.startAccessingSecurityScopedResource()
+            let accessingOutput = outputURL.startAccessingSecurityScopedResource()
+            defer {
+                if accessingSource {
+                    sourceURL.stopAccessingSecurityScopedResource()
+                }
+                if accessingOutput {
+                    outputURL.stopAccessingSecurityScopedResource()
+                }
+            }
+            await Task.yield()
             do {
                 let fileManager = FileManager.default
                 let enumerator = fileManager.enumerator(at: sourceURL,
                                                       includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey],
                                                       options: [.skipsHiddenFiles])
-                var totalFiles = 0
-                var processedFiles = 0
                 var filesToProcess: [(url: URL, date: Date)] = []
                 var hasExtras = false
                 var firstYear: Int?
                 
-                // First collect all files to process
+                // Pass 1: collect matching file URLs (fast — no EXIF yet) so we know N for accurate progress
+                var candidateURLs: [URL] = []
                 while let fileURL = enumerator?.nextObject() as? URL {
-                    if shouldProcessFile(fileURL) {
-                        let fileDate = getEffectiveDate(from: fileURL)
-                        filesToProcess.append((fileURL, fileDate))
-                        totalFiles += 1
+                    if self.shouldProcessFile(fileURL) {
+                        candidateURLs.append(fileURL)
                     }
                 }
+                let totalFileCount = candidateURLs.count
                 
-                if totalFiles == 0 {
+                if totalFileCount == 0 {
                     await MainActor.run {
-                        isProcessing = false
-                        progress = 0
-                        shouldResetSourceURL = true
+                        self.completionMessage = "No files were found to process. Check the extension filter, folder access, and try choosing the folders again (drag them onto the drop zones)."
+                        self.completionFolderURL = nil
+                        self.showCompletionAlert = true
+                        self.isProcessing = false
+                        self.progress = 0
+                        self.progressDetail = ""
+                        self.shouldResetSourceURL = true
                     }
                     return
                 }
                 
-                // Sort files by date
-                filesToProcess.sort { $0.date < $1.date }
-                
-                // Determine sequence breaks if auto-split is enabled
-                var sequenceBreaks: [Int] = [0]
-                if autoSplit {
-                    if let normalInterval = detectNormalInterval(in: filesToProcess) {
-                        sequenceBreaks = findSequenceBreaks(in: filesToProcess, normalInterval: normalInterval)
+                // Pass 2: read dates / metadata — linear progress 0 … metadataProgressWeight
+                let wMeta = Self.metadataProgressWeight
+                filesToProcess.reserveCapacity(totalFileCount)
+                for (idx, fileURL) in candidateURLs.enumerated() {
+                    if Task.isCancelled { break }
+                    let fileDate = self.getEffectiveDate(from: fileURL)
+                    filesToProcess.append((fileURL, fileDate))
+                    let done = idx + 1
+                    await MainActor.run {
+                        let p = wMeta * Double(done) / Double(totalFileCount)
+                        self.progress = min(1.0, p)
+                        self.progressDetail = "Reading metadata \(done) / \(totalFileCount): \(fileURL.lastPathComponent)"
                     }
                 }
                 
+                // Sort files by date
+                filesToProcess.sort { $0.date < $1.date }
+                let derivedYear = Calendar.current.component(.year, from: filesToProcess[0].date)
+                firstYear = derivedYear
+                
+                await MainActor.run {
+                    self.progressDetail = "Preparing sequences…"
+                }
+                
+                // Determine sequence breaks if auto-split is enabled
+                var sequenceBreaks: [Int] = [0]
+                if self.autoSplit {
+                    if let normalInterval = self.detectNormalInterval(in: filesToProcess) {
+                        sequenceBreaks = self.findSequenceBreaks(in: filesToProcess, normalInterval: normalInterval)
+                    }
+                }
+                
+                // Copy phase: linear progress metadataWeight … 1.0, updated after each file copied
+                var filesCopied = 0
+                let wCopy = Self.copyProgressWeight
+                
                 // Process each sequence
+                var didProcessFullSequence = false
                 for i in 0..<sequenceBreaks.count {
                     if Task.isCancelled { break }
                     
@@ -282,41 +360,52 @@ class RenameViewModel: ObservableObject {
                     let endIndex = i < sequenceBreaks.count - 1 ? sequenceBreaks[i + 1] : filesToProcess.count
                     let sequenceFiles = Array(filesToProcess[startIndex..<endIndex])
                     
-                    // Skip small sequences
-                    if sequenceFiles.count < minSequenceSize {
+                    // Sequences smaller than min size go to Extras (see README)
+                    if sequenceFiles.count < self.minSequenceSize {
                         hasExtras = true
+                        try await self.copySmallSequenceToExtras(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy)
                         continue
                     }
                     
-                    try await processSequence(sequenceFiles, in: outputURL)
-                    processedFiles += sequenceFiles.count
-                    
-                    let progressValue = min(Double(processedFiles) / Double(totalFiles), 1.0)
-                    await MainActor.run {
-                        progress = progressValue
-                    }
+                    try await self.processSequence(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy)
+                    didProcessFullSequence = true
                 }
                 
                 // Set completion message and folder URL
                 await MainActor.run {
-                    if hasExtras {
-                        completionMessage = "Extra files were found not matching any sequence. Check the Extras folder."
-                        if let year = firstYear {
-                            completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
-                        }
-                    } else if let year = firstYear {
-                        completionMessage = "Ingest has completed successfully to the \(year) folder"
-                        completionFolderURL = outputURL.appendingPathComponent("\(year)")
+                    guard let year = firstYear else {
+                        self.completionMessage = "Ingest finished."
+                        self.completionFolderURL = nil
+                        self.showCompletionAlert = true
+                        self.shouldResetSourceURL = true
+                        return
                     }
-                    showCompletionAlert = true
-                    shouldResetSourceURL = true
+                    if hasExtras && didProcessFullSequence {
+                        self.completionMessage = "Ingest finished. Full sequences are in dated folders; sets with fewer than \(self.minSequenceSize) images are in Extras."
+                        self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
+                    } else if hasExtras {
+                        self.completionMessage = "Files were copied to Extras (each sequence had fewer than \(self.minSequenceSize) images)."
+                        self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
+                    } else {
+                        self.completionMessage = "Ingest has completed successfully to the \(year) folder"
+                        self.completionFolderURL = outputURL.appendingPathComponent("\(year)")
+                    }
+                    self.showCompletionAlert = true
+                    self.shouldResetSourceURL = true
                 }
             } catch {
                 print("Error during renaming: \(error)")
+                await MainActor.run {
+                    self.completionMessage = "Ingest failed: \(error.localizedDescription)"
+                    self.completionFolderURL = nil
+                    self.showCompletionAlert = true
+                    self.progressDetail = ""
+                }
             }
             await MainActor.run {
-                isProcessing = false
-                progress = 0
+                self.isProcessing = false
+                self.progress = 0
+                self.progressDetail = ""
             }
         }
     }
@@ -325,6 +414,7 @@ class RenameViewModel: ObservableObject {
         currentOperation?.cancel()
         isProcessing = false
         progress = 0
+        progressDetail = ""
     }
     
     private func shouldProcessFile(_ url: URL) -> Bool {
@@ -545,8 +635,54 @@ class RenameViewModel: ObservableObject {
         }
     }
     
+    /// Copies files from short sequences into `Output/YYYY/Extras/` using `yyyyMMdd-HHmmss` names (README).
+    private func copySmallSequenceToExtras(
+        _ sequenceFiles: [(url: URL, date: Date)],
+        in outputURL: URL,
+        totalFileCount: Int,
+        filesCopied: inout Int,
+        wMeta: Double,
+        wCopy: Double
+    ) async throws {
+        let fileManager = FileManager.default
+        for fileInfo in sequenceFiles {
+            if Task.isCancelled { break }
+            let fileDate = fileInfo.date
+            let year = Calendar.current.component(.year, from: fileDate)
+            let extrasFolder = outputURL
+                .appendingPathComponent("\(year)")
+                .appendingPathComponent("Extras")
+            try fileManager.createDirectory(at: extrasFolder, withIntermediateDirectories: true)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyyMMdd-HHmmss"
+            let baseName = formatter.string(from: fileDate)
+            let ext = fileInfo.url.pathExtension
+            var destURL = extrasFolder.appendingPathComponent("\(baseName).\(ext)")
+            var collision = 2
+            while fileManager.fileExists(atPath: destURL.path) {
+                destURL = extrasFolder.appendingPathComponent("\(baseName)_\(collision).\(ext)")
+                collision += 1
+            }
+            try fileManager.copyItem(at: fileInfo.url, to: destURL)
+            filesCopied += 1
+            let p = wMeta + wCopy * Double(filesCopied) / Double(max(totalFileCount, 1))
+            let name = destURL.lastPathComponent
+            await MainActor.run {
+                self.progress = min(1.0, p)
+                self.progressDetail = "Copying \(filesCopied) / \(totalFileCount): → \(name)"
+            }
+        }
+    }
+    
     // Handles copying and numbering for a sequence, supporting addToExisting logic
-    private func processSequence(_ sequenceFiles: [(url: URL, date: Date)], in outputURL: URL) async throws {
+    private func processSequence(
+        _ sequenceFiles: [(url: URL, date: Date)],
+        in outputURL: URL,
+        totalFileCount: Int,
+        filesCopied: inout Int,
+        wMeta: Double,
+        wCopy: Double
+    ) async throws {
         let fileManager = FileManager.default
         var effectiveBasename = basename
         var sequenceNumber = 1
@@ -595,6 +731,13 @@ class RenameViewModel: ObservableObject {
             try fileManager.copyItem(at: fileURL, to: destinationURL)
             currentNumber += 1
             if idx == 0 { sequenceFolderURL = baseFolderURL }
+            filesCopied += 1
+            let p = wMeta + wCopy * Double(filesCopied) / Double(max(totalFileCount, 1))
+            let writtenName = destinationURL.lastPathComponent
+            await MainActor.run {
+                self.progress = min(1.0, p)
+                self.progressDetail = "Copying \(filesCopied) / \(totalFileCount): → \(writtenName)"
+            }
         }
         // Set the completion folder to the sequence folder if available
         if let folder = sequenceFolderURL {

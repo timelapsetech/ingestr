@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1] - 2024-06-XX
+## [1.2] - 2026-04-17
+### Added
+- Click the source or output drop zone to open a folder picker (in addition to drag-and-drop).
+- Per-step progress detail during ingest (e.g. current file while reading metadata and while copying).
+
+### Improved
+- Ingest work runs off the main thread so the window stays responsive; progress updates during metadata reads and copies (including small sequences moved to Extras).
+- Weighted progress: metadata pass and copy phase each contribute to the bar proportionally.
+- Start Ingesting is disabled while a run is in progress.
+- Clearer message when no files match the current settings (extension filter, folder access, etc.).
+
+### Changed
+- Release build entitlements no longer include debug-oriented hardened-runtime exceptions (JIT, unsigned executable memory, etc.); distribution should rely on normal signing and notarization.
+
+## [1.1] - 2025-05-18
 ### Added
 - "Add to Existing" option: Continue numbering in an existing image sequence, matching zero-padding and appending new images without overwriting.
 - Automated unit tests for sequence detection, filename generation, and add-to-existing logic.
@@ -17,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Various edge cases in sequence detection and file naming.
 
-## [1.0] - 2024-XX-XX
+## [1.0] - 2025-05-17
 - Initial release.
 
 ### Added

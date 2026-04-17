@@ -21,9 +21,10 @@ struct ContentView: View {
                 // Source Directory Section
                 DirectoryDropZone(
                     title: "Source Directory",
-                    subtitle: "Drag and drop a folder here",
+                    subtitle: "Drag a folder here, or click to choose",
                     isTargeted: $viewModel.isSourceTargeted,
                     onDrop: viewModel.handleSourceDrop,
+                    onSelectFolder: viewModel.selectSourceFolder,
                     selectedPath: viewModel.sourceURL?.path
                 )
                 
@@ -95,9 +96,10 @@ struct ContentView: View {
                 // Output Directory Section (always shown)
                 DirectoryDropZone(
                     title: "Output Directory",
-                    subtitle: "Drag and drop output folder here",
+                    subtitle: "Drag a folder here, or click to choose",
                     isTargeted: $viewModel.isOutputTargeted,
                     onDrop: viewModel.handleOutputDrop,
+                    onSelectFolder: viewModel.selectOutputFolder,
                     selectedPath: viewModel.outputURL?.path
                 )
                 .overlay(alignment: .topTrailing) {
@@ -115,10 +117,26 @@ struct ContentView: View {
                 
                 // Progress Section
                 if viewModel.isProcessing {
-                    ProgressView(value: viewModel.progress, total: 1.0) {
-                        Text("Processing files... \(Int(viewModel.progress * 100))%")
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Ingesting")
+                                .font(.headline)
+                            Spacer(minLength: 8)
+                            Text("\(Int(min(1.0, viewModel.progress) * 100))%")
+                                .font(.headline.monospacedDigit())
+                                .foregroundColor(.secondary)
+                        }
+                        ProgressView(value: min(1.0, viewModel.progress), total: 1.0)
+                            .progressViewStyle(.linear)
+                        Text(viewModel.progressDetail.isEmpty ? "Starting…" : viewModel.progressDetail)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
                     }
                     .padding()
+                    .accessibilityElement(children: .combine)
                 }
                 
                 // Action Buttons

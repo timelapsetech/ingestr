@@ -5,6 +5,7 @@ struct DirectoryDropZone: View {
     let subtitle: String
     @Binding var isTargeted: Bool
     let onDrop: ([NSItemProvider]) -> Bool
+    let onSelectFolder: () -> Void
     var selectedPath: String?
     
     var body: some View {
@@ -24,10 +25,19 @@ struct DirectoryDropZone: View {
                 Text(subtitle)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
         .frame(height: 100)
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .onTapGesture {
+            onSelectFolder()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityHint("Activates the folder picker. You can also drag a folder onto this area.")
+        .accessibilityAddTraits(.isButton)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
@@ -47,6 +57,7 @@ struct DirectoryDropZone: View {
         subtitle: "Drop here",
         isTargeted: .constant(false),
         onDrop: { _ in true },
+        onSelectFolder: {},
         selectedPath: "/Users/example/Documents"
     )
 } 
