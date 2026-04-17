@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How to use Ingestr — options and output layout</title>
+  <meta name="description" content="How to ingest folders, configure rename options, extension filters, Add to Existing, and understand the year and sequence folder structure on disk.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="brand" href="index.html">Ingestr</a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="index.html#app">The app</a>
+        <a href="index.html#features">Features</a>
+        <a href="guide.html" aria-current="page">How to use</a>
+        <a class="btn btn-primary" href="https://github.com/timelapsetech/ingestr/releases/latest/download/Ingestr.zip">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="article">
+    <div class="wrap page-title">
+      <p class="breadcrumb"><a href="index.html">Ingestr</a> / How to use</p>
+      <h1>How to use Ingestr</h1>
+    </div>
+
+    <section id="quick-start" aria-labelledby="quick-start-heading">
+      <div class="wrap">
+        <h2 id="quick-start-heading">Quick start</h2>
+        <ol class="steps">
+          <li><strong>Launch Ingestr</strong> on your Mac (macOS 12 or later).</li>
+          <li><strong>Source directory:</strong> Drag a folder onto the Source area, or click the zone to choose a folder. This is where your images (or nested folders of images) live.</li>
+          <li><strong>Output directory:</strong> Drag or choose where organized sequences should be written.</li>
+          <li><strong>Options:</strong> Set the file extension filter and rename options (explained below).</li>
+          <li><strong>Start Ingesting:</strong> The app shows progress and detail while it works. You can cancel an in-progress run.</li>
+          <li><strong>When finished:</strong> Use <strong>Open Folder</strong> in the completion alert to reveal the result in Finder.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="options" aria-labelledby="options-heading">
+      <div class="wrap">
+        <h2 id="options-heading">Options explained</h2>
+        <p class="lead">These match the labels in the app’s <strong>Rename Options</strong> section.</p>
+
+        <dl class="dl-options">
+          <dt>File extension</dt>
+          <dd>
+            Enter an extension (for example <code>jpg</code> or <code>raw</code>) to process only files with that extension.
+            Leave the field empty to include all files the app considers.
+          </dd>
+
+          <dt>Auto Rename</dt>
+          <dd>
+            When <strong>on</strong>, Ingestr uses EXIF date information from your images to build folder names and a consistent naming pattern.
+            Typical folder name shape: <code>YYYYMMDDXCO_</code> where the date comes from the image, <code>X</code> is a sequence index for that day, and <code>CO</code> marks camera originals.
+            When <strong>off</strong>, you choose a <strong>Base Name</strong> yourself and files are numbered after that prefix.
+          </dd>
+
+          <dt>Auto Split Sequences</dt>
+          <dd>
+            Available when <strong>Auto Rename</strong> is on. Detects significant time gaps between shots and starts a new sequence instead of lumping everything into one run.
+            Helpful when one folder contains images from more than one session.
+          </dd>
+
+          <dt>Add to Existing</dt>
+          <dd>
+            When enabled, Ingestr looks at files already in the destination that match the naming pattern, finds the highest existing number, and continues from the next value using the same zero-padding.
+            Use this to add new images to an ingest you already ran without overwriting or duplicating numbers.
+          </dd>
+
+          <dt>Base Name</dt>
+          <dd>
+            Shown when <strong>Auto Rename</strong> is off. This is the text prefix before the sequence number (for example <code>MyShoot_</code>).
+          </dd>
+
+          <dt>Number Padding</dt>
+          <dd>
+            How many digits to use for the numeric part (for example 4 digits → <code>0001</code>, <code>0002</code>, …). Keeps filenames sorting correctly in Finder and other tools.
+          </dd>
+
+          <dt>Start Number</dt>
+          <dd>
+            The first number to use for the sequence. Pair with <strong>Add to Existing</strong> when you need to align with work already on disk, or set manually when you want a specific starting index.
+          </dd>
+        </dl>
+      </div>
+    </section>
+
+    <section id="output" aria-labelledby="output-heading">
+      <div class="wrap">
+        <h2 id="output-heading">Output folder layout</h2>
+        <p class="lead">
+          With <strong>Auto Rename</strong>, Ingestr organizes output under a year folder, then per-sequence folders. Small or non-sequential groups may go to <strong>Extras</strong>.
+        </p>
+        <pre class="structure" role="img" aria-label="Example output folder tree">Output Directory/
+└── YYYY/
+    ├── YYYYMMDD1CO_/
+    │   ├── YYYYMMDD1CO_0001.jpg
+    │   ├── YYYYMMDD1CO_0002.jpg
+    │   └── ...
+    ├── YYYYMMDD2CO_/
+    │   └── ...
+    └── Extras/
+        ├── YYYYMMDD-HHMMSS.jpg
+        └── ...</pre>
+      </div>
+    </section>
+
+    <section id="install" aria-labelledby="install-heading">
+      <div class="wrap">
+        <h2 id="install-heading">Installation</h2>
+        <p class="lead">
+          <a href="https://github.com/timelapsetech/ingestr/releases/latest/download/Ingestr.zip">Download Ingestr.zip</a> (the signed app archive—not the “Source code” download on the release, which is only the repository).
+          Unzip it, drag <strong>Ingestr.app</strong> into Applications, and launch. Grant folder access when macOS asks, so Ingestr can read your source and write the destination.
+        </p>
+      </div>
+    </section>
+
+    <section aria-labelledby="more-heading">
+      <div class="wrap">
+        <h2 id="more-heading">More detail in the repo</h2>
+        <p class="lead">
+          The project README includes the same option reference, requirements, and development notes:
+          <a href="https://github.com/timelapsetech/ingestr/blob/main/README.md">README.md on GitHub</a>.
+        </p>
+        <p><a class="btn btn-secondary" href="index.html">← Back to overview</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>Copyright © 2026 Time Lapse Technologies. <a href="https://timelapsetech.com">timelapsetech.com</a></p>
+      <p><a href="https://github.com/timelapsetech/ingestr">github.com/timelapsetech/ingestr</a></p>
+    </div>
+  </footer>
+</body>
+</html>
