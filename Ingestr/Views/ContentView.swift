@@ -86,6 +86,16 @@ struct ContentView: View {
                             .frame(width: 80)
                         Stepper("", value: $viewModel.startNumber, in: 1...999999) { _ in }
                     }
+
+                    Picker("Copy verification", selection: $viewModel.copyVerificationMode) {
+                        ForEach(CopyVerificationMode.allCases) { mode in
+                            Text(mode.menuTitle).tag(mode)
+                        }
+                    }
+                    Text("None matches previous behavior. Full checks byte-for-byte copies (slower). Size only compares file sizes after copy.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding()
                 .background(

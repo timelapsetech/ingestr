@@ -71,6 +71,13 @@
             Use this to add new images to an ingest you already ran without overwriting or duplicating numbers.
           </dd>
 
+          <dt>Copy verification</dt>
+          <dd>
+            <strong>None</strong> (default) uses the same copy behavior as earlier releases—no extra checks.
+            <strong>Full</strong> copies in a streaming pass while computing a SHA-256 digest, then reads the destination once to confirm the bytes match (strongest check; slower on very large batches).
+            <strong>Size only</strong> compares file sizes after copy (minimal overhead; does not catch corruption when sizes still match).
+          </dd>
+
           <dt>Base Name</dt>
           <dd>
             Shown when <strong>Auto Rename</strong> is off. This is the text prefix before the sequence number (for example <code>MyShoot_</code>).

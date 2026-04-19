@@ -2,7 +2,7 @@
 
 A modern macOS application for ingesting and organizing image sequences. Ingestr automatically organizes your images into date-based folders and handles sequence detection and naming.
 
-**Current release:** 1.2 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
+**Current release:** 1.3 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ![Ingestr Application](Ingestr/Resources/app_screenshot.png)
 
@@ -75,6 +75,11 @@ For distribution without that prompt, maintainers should archive with a **Develo
 - Automatically detects time gaps between images
 - Creates new sequences when a significant time gap is detected
 - Helps organize photos from different shooting sessions
+
+#### Copy verification
+- **None** (default): copies files with the system copy API only—the same as previous releases.
+- **Full**: streams each file while hashing, then hashes the destination to confirm a byte-for-byte match (extra disk read of the written file).
+- **Size only**: after copy, compares source and destination file sizes (very low overhead; does not detect same-size corruption).
 
 #### Base Name
 - Only available when Auto Rename is disabled

@@ -15,6 +15,8 @@
 		1A1A1A1A1A1A1A1A1A1A1A40 /* Ingestr.icns in Resources */ = {isa = PBXBuildFile; fileRef = 1A1A1A1A1A1A1A1A1A1A1A41 /* Ingestr.icns */; };
 		1A1A1A1A1A1A1A1A1A1A1A46 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A1A1A1A1A1A1A1A1A1A1A47 /* Assets.xcassets */; };
 		C28C9AA32DD8181C003101EA /* RenameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28C9AA22DD8181C003101EA /* RenameViewModel.swift */; };
+		D001D001D001D001D001D002 /* CopyVerificationMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = D001D001D001D001D001D001 /* CopyVerificationMode.swift */; };
+		D001D001D001D001D001D004 /* VerifiedFileCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D001D001D001D001D001D003 /* VerifiedFileCopy.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,6 +42,8 @@
 		1A1A1A1A1A1A1A1A1A1A1A47 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C26BE6E72DDA924800F71594 /* IngestrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IngestrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C28C9AA22DD8181C003101EA /* RenameViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenameViewModel.swift; sourceTree = "<group>"; };
+		D001D001D001D001D001D001 /* CopyVerificationMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyVerificationMode.swift; sourceTree = "<group>"; };
+		D001D001D001D001D001D003 /* VerifiedFileCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifiedFileCopy.swift; sourceTree = "<group>"; };
 		C28C9AA42DD81EBC003101EA /* IngestrRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IngestrRelease.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -128,6 +132,8 @@
 		1A1A1A1A1A1A1A1A1A1A1A45 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				D001D001D001D001D001D001 /* CopyVerificationMode.swift */,
+				D001D001D001D001D001D003 /* VerifiedFileCopy.swift */,
 				1A1A1A1A1A1A1A1A1A1A1A43 /* icon_generator.py */,
 			);
 			path = Utilities;
@@ -244,6 +250,8 @@
 				1A1A1A1A1A1A1A1A1A1A1A20 /* FileFilterSection.swift in Sources */,
 				1A1A1A1A1A1A1A1A1A1A1A37 /* AppDelegate.swift in Sources */,
 				1A1A1A1A1A1A1A1A1A1A1A1A /* IngestrApp.swift in Sources */,
+				D001D001D001D001D001D002 /* CopyVerificationMode.swift in Sources */,
+				D001D001D001D001D001D004 /* VerifiedFileCopy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -397,7 +405,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 2D8MBBQWXH;
@@ -411,7 +419,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetech.ingestr;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -429,7 +437,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 2D8MBBQWXH;
@@ -444,7 +452,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetech.ingestr;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -462,7 +470,7 @@
 				DEVELOPMENT_TEAM = 2D8MBBQWXH;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.3;
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetech.IngestrTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -480,7 +488,7 @@
 				DEVELOPMENT_TEAM = L5A7Q6UWNT;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.3;
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.timelapsetech.IngestrTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;

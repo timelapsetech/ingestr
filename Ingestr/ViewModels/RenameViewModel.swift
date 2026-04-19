@@ -42,6 +42,12 @@ class RenameViewModel: ObservableObject {
     @Published var showCompletionAlert: Bool = false
     @Published var completionMessage: String = ""
     @Published var completionFolderURL: URL?
+    /// After-ingest copy check: `.none` matches legacy `copyItem`-only behavior.
+    @Published var copyVerificationMode: CopyVerificationMode = .none {
+        didSet {
+            UserDefaults.standard.set(copyVerificationMode.rawValue, forKey: CopyVerificationMode.userDefaultsKey)
+        }
+    }
     
     // Constants for auto-split
     private let defaultGapThreshold: TimeInterval = 60 // 1 minute
@@ -267,6 +273,7 @@ class RenameViewModel: ObservableObject {
     
     func startRenaming() {
         guard let sourceURL = sourceURL, let outputURL = outputURL else { return }
+        let verificationMode = copyVerificationMode
         isProcessing = true
         progress = 0
         progressDetail = "Listing files…"
@@ -363,27 +370,30 @@ class RenameViewModel: ObservableObject {
                     // Sequences smaller than min size go to Extras (see README)
                     if sequenceFiles.count < self.minSequenceSize {
                         hasExtras = true
-                        try await self.copySmallSequenceToExtras(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy)
+                        try await self.copySmallSequenceToExtras(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy, verificationMode: verificationMode)
                         continue
                     }
                     
-                    try await self.processSequence(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy)
+                    try await self.processSequence(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy, verificationMode: verificationMode)
                     didProcessFullSequence = true
                 }
                 
                 // Set completion message and folder URL
+                let yearForCompletion = firstYear
+                let hasExtrasSnapshot = hasExtras
+                let didProcessFullSequenceSnapshot = didProcessFullSequence
                 await MainActor.run {
-                    guard let year = firstYear else {
+                    guard let year = yearForCompletion else {
                         self.completionMessage = "Ingest finished."
                         self.completionFolderURL = nil
                         self.showCompletionAlert = true
                         self.shouldResetSourceURL = true
                         return
                     }
-                    if hasExtras && didProcessFullSequence {
+                    if hasExtrasSnapshot && didProcessFullSequenceSnapshot {
                         self.completionMessage = "Ingest finished. Full sequences are in dated folders; sets with fewer than \(self.minSequenceSize) images are in Extras."
                         self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
-                    } else if hasExtras {
+                    } else if hasExtrasSnapshot {
                         self.completionMessage = "Files were copied to Extras (each sequence had fewer than \(self.minSequenceSize) images)."
                         self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
                     } else {
@@ -642,7 +652,8 @@ class RenameViewModel: ObservableObject {
         totalFileCount: Int,
         filesCopied: inout Int,
         wMeta: Double,
-        wCopy: Double
+        wCopy: Double,
+        verificationMode: CopyVerificationMode
     ) async throws {
         let fileManager = FileManager.default
         for fileInfo in sequenceFiles {
@@ -663,13 +674,14 @@ class RenameViewModel: ObservableObject {
                 destURL = extrasFolder.appendingPathComponent("\(baseName)_\(collision).\(ext)")
                 collision += 1
             }
-            try fileManager.copyItem(at: fileInfo.url, to: destURL)
-            filesCopied += 1
-            let p = wMeta + wCopy * Double(filesCopied) / Double(max(totalFileCount, 1))
             let name = destURL.lastPathComponent
+            try await VerifiedFileCopy.copyWithVerification(from: fileInfo.url, to: destURL, mode: verificationMode)
+            filesCopied += 1
+            let copiedCount = filesCopied
+            let p = wMeta + wCopy * Double(copiedCount) / Double(max(totalFileCount, 1))
             await MainActor.run {
                 self.progress = min(1.0, p)
-                self.progressDetail = "Copying \(filesCopied) / \(totalFileCount): → \(name)"
+                self.progressDetail = "Copying \(copiedCount) / \(totalFileCount): → \(name)"
             }
         }
     }
@@ -681,7 +693,8 @@ class RenameViewModel: ObservableObject {
         totalFileCount: Int,
         filesCopied: inout Int,
         wMeta: Double,
-        wCopy: Double
+        wCopy: Double,
+        verificationMode: CopyVerificationMode
     ) async throws {
         let fileManager = FileManager.default
         var effectiveBasename = basename
@@ -728,15 +741,16 @@ class RenameViewModel: ObservableObject {
             let fileExtension = fileURL.pathExtension
             let newName = "\(baseNameWithUnderscore)\(paddedNumber).\(fileExtension)"
             let destinationURL = baseFolderURL.appendingPathComponent(newName)
-            try fileManager.copyItem(at: fileURL, to: destinationURL)
+            let writtenName = destinationURL.lastPathComponent
+            try await VerifiedFileCopy.copyWithVerification(from: fileURL, to: destinationURL, mode: verificationMode)
             currentNumber += 1
             if idx == 0 { sequenceFolderURL = baseFolderURL }
             filesCopied += 1
-            let p = wMeta + wCopy * Double(filesCopied) / Double(max(totalFileCount, 1))
-            let writtenName = destinationURL.lastPathComponent
+            let copiedCount = filesCopied
+            let p = wMeta + wCopy * Double(copiedCount) / Double(max(totalFileCount, 1))
             await MainActor.run {
                 self.progress = min(1.0, p)
-                self.progressDetail = "Copying \(filesCopied) / \(totalFileCount): → \(writtenName)"
+                self.progressDetail = "Copying \(copiedCount) / \(totalFileCount): → \(writtenName)"
             }
         }
         // Set the completion folder to the sequence folder if available
@@ -751,6 +765,10 @@ class RenameViewModel: ObservableObject {
         // Load last output directory from UserDefaults
         if let lastOutputPath = UserDefaults.standard.string(forKey: "lastOutputDirectory") {
             outputURL = URL(fileURLWithPath: lastOutputPath)
+        }
+        if let raw = UserDefaults.standard.string(forKey: CopyVerificationMode.userDefaultsKey),
+           let mode = CopyVerificationMode(rawValue: raw) {
+            copyVerificationMode = mode
         }
     }
 } 
