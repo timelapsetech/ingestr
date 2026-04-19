@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3] - 2026-04-19
+### Added
+- **Copy verification** (Rename Options): choose **None** (default, same behavior as before), **Full** (streaming SHA-256 copy plus destination hash check), or **Size only** (compare file sizes after copy). The choice is saved between launches.
+
 ## [1.2] - 2026-04-17
 ### Added
 - Click the source or output drop zone to open a folder picker (in addition to drag-and-drop).
