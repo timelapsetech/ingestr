@@ -368,3 +368,48 @@ pre.structure {
 .article section:first-of-type h2 {
   margin-top: 0;
 }
+
+/* Legal / privacy */
+.legal section {
+  padding: 1.25rem 0;
+}
+
+.legal h2 {
+  font-size: 1.2rem;
+  margin-bottom: 0.65rem;
+}
+
+.legal-meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+.legal-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.35rem;
+  color: var(--text-muted);
+}
+
+.legal-list li {
+  margin-bottom: 0.45rem;
+}
+
+.legal-contact {
+  margin-top: 0.75rem;
+  padding: 1rem 1.15rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  line-height: 1.6;
+}
+
+.legal-disclaimer {
+  margin-top: 2rem;
+  padding: 1rem 1.15rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 6%, var(--bg-elevated));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
