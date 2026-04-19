@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ingestr — Rename and sort image sequences automatically</title>
-  <meta name="description" content="Ingestr is a simple macOS app for photographers who shoot image sequences. Drag folders, set options, and ingest thousands of stills into dated, numbered folders with smart sequence detection.">
+  <meta name="description" content="Ingestr is a simple macOS app for photographers who shoot image sequences. Drag folders, set options, and ingest thousands of stills into dated, numbered folders—with optional copy verification so you can trust every file landed correctly.">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -25,7 +25,7 @@
       <div class="wrap">
         <h1>Sort and rename image sequences—the easy way</h1>
         <p class="tagline">
-          Ingestr is a focused macOS app for anyone who shoots hundreds or thousands of stills (time lapse, bursts, or card dumps) and needs them renamed and organized into clear, dated folders—without a spreadsheet or manual numbering.
+          Ingestr is a focused macOS app for anyone who shoots hundreds or thousands of stills (time lapse, bursts, or card dumps) and needs them renamed and organized into clear, dated folders—without a spreadsheet or manual numbering. Built-in <strong>copy verification</strong> lets you optionally check that each file copied correctly, from a quick size check up to a full byte-for-byte pass.
         </p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="https://github.com/timelapsetech/ingestr/releases/latest/download/Ingestr.zip">Download for macOS</a>
@@ -35,7 +35,7 @@
 
         <div id="app" class="app-preview">
           <p class="lead app-preview-lead">
-            Pick a source folder and an output folder, choose how files should be named, and start ingesting. The window stays responsive on large jobs, with a clear progress bar and per-step status while metadata is read and files are copied.
+            Pick a source folder and an output folder, choose how files should be named, and start ingesting. The window stays responsive on large jobs, with a clear progress bar and per-step status while metadata is read and files are copied. Under <strong>Rename Options</strong>, set <strong>Copy verification</strong> to match how careful you want to be—default stays fast; stronger modes help ensure nothing was lost in transit.
           </p>
           <figure class="figure">
             <img src="images/Ingestr_1_2_screenshot.png" alt="Ingestr main window showing source and output directories, file extension filter, rename options, and Start Ingesting button">
@@ -79,6 +79,10 @@
           <article class="card">
             <h3>Add to existing</h3>
             <p>Append new shots to a sequence that is already on disk: finds the last number, matches padding, and continues without collisions.</p>
+          </article>
+          <article class="card">
+            <h3>Copy verification</h3>
+            <p>Optional checks when files are copied to the destination: leave it off for the same speed as before, compare sizes for a light sanity check, or use full verification when you need confidence every byte matches.</p>
           </article>
         </div>
       </div>
