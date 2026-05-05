@@ -24,7 +24,7 @@ If applicable, add screenshots to help explain your problem.
 
 **Environment:**
  - macOS Version: [e.g. 13.0]
- - Ingestr Version: [e.g. 1.3]
+ - Ingestr Version: [e.g. 1.4]
  - Hardware: [e.g. MacBook Pro M1]
 
 **Additional context**

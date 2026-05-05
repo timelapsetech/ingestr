@@ -10,7 +10,7 @@ struct IngestrApp: App {
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
                     if let window = NSApplication.shared.windows.first {
-                        window.setContentSize(NSSize(width: 450, height: 640))
+                        window.setContentSize(NSSize(width: 450, height: 760))
                     }
                 }
         }

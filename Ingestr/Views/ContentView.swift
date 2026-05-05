@@ -4,6 +4,14 @@ struct ContentView: View {
     @StateObject private var viewModel = RenameViewModel()
     @Environment(\.colorScheme) var colorScheme
     
+    /// Tooltip copy for Auto Rename / Auto Split (also used for VoiceOver hints).
+    private enum RenameTooltip {
+        static let autoRename =
+            "Uses image metadata (such as EXIF capture date) from the first image in each sequence to determine that sequence's date, then builds folder and file names from it—for example the dated sequence folder pattern."
+        static let autoSplit =
+            "When Auto Rename is on: detects breaks in image sequence cadence—intervals between shots much larger than the usual spacing—and starts a new sequence automatically."
+    }
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 15) {
@@ -17,6 +25,35 @@ struct ContentView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(.top, 20)
+                
+                // Ingest mode: sequence (existing behavior) vs photo (date folders + timestamp names)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Ingest mode")
+                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 8) {
+                        IngestModeRow(
+                            title: IngestMode.sequence.title,
+                            subtitle: "Group images into sequences with numbered dated folders.",
+                            isSelected: viewModel.ingestMode == .sequence,
+                            tooltip: IngestMode.sequenceHelp
+                        ) {
+                            viewModel.ingestMode = .sequence
+                        }
+                        IngestModeRow(
+                            title: IngestMode.photo.title,
+                            subtitle: "No sequences—each file under Year/Month/Day with a timestamp name.",
+                            isSelected: viewModel.ingestMode == .photo,
+                            tooltip: IngestMode.photoHelp
+                        ) {
+                            viewModel.ingestMode = .photo
+                        }
+                    }
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.gray.opacity(0.1))
+                )
                 
                 // Source Directory Section
                 DirectoryDropZone(
@@ -47,18 +84,52 @@ struct ContentView: View {
                     Text("Rename Options")
                         .font(.headline)
 
-                    // Auto Rename Toggle
-                    Toggle("Auto Rename", isOn: $viewModel.autoRename)
-                        .padding(.bottom, 5)
+                    // Native `.help` on `Toggle` often never appears on macOS. Show the same text via `Image`+`.help`
+                    // (reliable) and mirror it with `accessibilityHint` on the toggle for VoiceOver.
+                    HStack(alignment: .center, spacing: 12) {
+                        HStack(spacing: 6) {
+                            Toggle("Auto Rename", isOn: $viewModel.autoRename)
+                                .disabled(viewModel.ingestMode == .photo)
+                                .accessibilityHint(RenameTooltip.autoRename)
+                            RenameHelpTipIcon(tooltip: RenameTooltip.autoRename)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // Auto Split Toggle
-                    Toggle("Auto Split Sequences", isOn: $viewModel.autoSplit)
-                        .padding(.bottom, 5)
-                        .disabled(!viewModel.autoRename)
+                        HStack(spacing: 6) {
+                            Toggle("Auto Split", isOn: $viewModel.autoSplit)
+                                .disabled(!viewModel.autoRename || viewModel.ingestMode == .photo)
+                                .accessibilityHint(RenameTooltip.autoSplit)
+                            RenameHelpTipIcon(tooltip: RenameTooltip.autoSplit)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
-                    // Add to Existing Toggle
                     Toggle("Add to Existing", isOn: $viewModel.addToExisting)
-                        .padding(.bottom, 5)
+                        .disabled(viewModel.ingestMode == .photo)
+
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Number Padding")
+                                .font(.subheadline)
+                            Stepper(value: $viewModel.numberPadding, in: 1...10) {
+                                Text("\(viewModel.numberPadding) digits")
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Start Number")
+                                .font(.subheadline)
+                            HStack(spacing: 6) {
+                                TextField("", value: $viewModel.startNumber, formatter: NumberFormatter())
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 64)
+                                Stepper("", value: $viewModel.startNumber, in: 1...999999) { _ in }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .disabled(viewModel.ingestMode == .photo)
 
                     // Base Name
                     VStack(alignment: .leading) {
@@ -66,33 +137,21 @@ struct ContentView: View {
                             Text("Base Name:")
                             TextField("Enter base name", text: $viewModel.basename)
                                 .textFieldStyle(.roundedBorder)
-                                .disabled(viewModel.autoRename)
+                                .disabled(viewModel.autoRename || viewModel.ingestMode == .photo)
                         }
                     }
 
-                    // Number Padding
-                    HStack {
-                        Text("Number Padding:")
-                        Stepper(value: $viewModel.numberPadding, in: 1...10) {
-                            Text("\(viewModel.numberPadding) digits")
+                    ZStack(alignment: .leading) {
+                        Picker("Copy verification", selection: $viewModel.copyVerificationMode) {
+                            ForEach(CopyVerificationMode.allCases) { mode in
+                                Text(mode.menuTitle).tag(mode)
+                            }
                         }
                     }
-
-                    // Start Number
-                    HStack {
-                        Text("Start Number:")
-                        TextField("", value: $viewModel.startNumber, formatter: NumberFormatter())
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 80)
-                        Stepper("", value: $viewModel.startNumber, in: 1...999999) { _ in }
-                    }
-
-                    Picker("Copy verification", selection: $viewModel.copyVerificationMode) {
-                        ForEach(CopyVerificationMode.allCases) { mode in
-                            Text(mode.menuTitle).tag(mode)
-                        }
-                    }
-                    Text("None matches previous behavior. Full checks byte-for-byte copies (slower). Size only compares file sizes after copy.")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .help("Defaults to full checks, but select \"Size only\" or no verification for faster copies")
+                    Text("Defaults to Full—streaming copy plus byte-for-byte verification (slower on huge batches). Choose Size only or None for faster copies with lighter or no checks. Your choice is saved.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -169,7 +228,7 @@ struct ContentView: View {
             }
             .padding(.horizontal)
         }
-        .frame(minWidth: 400, maxWidth: 450, minHeight: 640)
+        .frame(minWidth: 400, maxWidth: 450, minHeight: 760)
         .background(colorScheme == .dark ? Color.black : Color.white)
         .onAppear {
             // Reset URL on app launch
@@ -187,6 +246,52 @@ struct ContentView: View {
         } message: {
             Text(viewModel.completionMessage)
         }
+    }
+}
+
+/// SF Symbol + `.help` shows native macOS tooltips reliably (unlike `Toggle` + `.help`).
+private struct RenameHelpTipIcon: View {
+    let tooltip: String
+    
+    var body: some View {
+        Image(systemName: "info.circle")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .help(tooltip)
+            .accessibilityHidden(true)
+    }
+}
+
+private struct IngestModeRow: View {
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+    let tooltip: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .imageScale(.large)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(.primary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(tooltip)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 

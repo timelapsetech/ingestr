@@ -302,6 +302,14 @@ pre.structure {
   color: var(--text-muted);
 }
 
+.dl-options dd p {
+  margin: 0 0 0.65rem;
+}
+
+.dl-options dd p:last-child {
+  margin-bottom: 0;
+}
+
 .steps {
   margin: 0;
   padding-left: 1.25rem;

@@ -84,6 +84,7 @@ enum VerifiedFileCopy {
         }
 
         var hasher = SHA256()
+        var chunkIndex = 0
         while true {
             if Task.isCancelled {
                 try? fm.removeItem(at: destination)
@@ -93,6 +94,11 @@ enum VerifiedFileCopy {
             if chunk.isEmpty { break }
             hasher.update(data: chunk)
             try dstHandle.write(contentsOf: chunk)
+            chunkIndex += 1
+            // Cooperate with the runtime so long copies don’t starve the main thread / UI updates.
+            if chunkIndex.isMultiple(of: 32) {
+                await Task.yield()
+            }
         }
         try dstHandle.synchronize()
 
@@ -103,6 +109,7 @@ enum VerifiedFileCopy {
         defer {
             try? verifyHandle.close()
         }
+        var verifyChunkIndex = 0
         while true {
             if Task.isCancelled {
                 try? fm.removeItem(at: destination)
@@ -111,6 +118,10 @@ enum VerifiedFileCopy {
             let chunk = try verifyHandle.read(upToCount: chunkSize) ?? Data()
             if chunk.isEmpty { break }
             destHasher.update(data: chunk)
+            verifyChunkIndex += 1
+            if verifyChunkIndex.isMultiple(of: 32) {
+                await Task.yield()
+            }
         }
         let actualDigest = destHasher.finalize()
         if actualDigest != expectedDigest {

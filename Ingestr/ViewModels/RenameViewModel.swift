@@ -16,6 +16,40 @@ enum NonSequentialPattern: String, CaseIterable {
     }
 }
 
+/// Controls whether ingest groups files into sequences or treats each file independently (photo layout).
+enum IngestMode: String, CaseIterable, Identifiable {
+    case sequence
+    case photo
+    
+    var id: String { rawValue }
+    
+    var title: String {
+        switch self {
+        case .sequence: return "Sequence mode"
+        case .photo: return "Photo mode"
+        }
+    }
+    
+    /// Shown in UI copy as an example path (matches real auto-rename folder/file prefixes; tooltip prose avoids spelling out this suffix).
+    static let sequenceOutputExample =
+        "Output/2025/202505041CO_/202505041CO_0001.jpg"
+    
+    static let photoOutputExample =
+        "Output/2025/05/04/2025-05-04-143052-847.jpg"
+    
+    /// Tooltip for sequence mode (full ingest behavior).
+    static let sequenceHelp =
+        "Example output:\n\(IngestMode.sequenceOutputExample)\n\nDetects sequences by capture time, splits on gaps when enabled, and moves small sets to Extras."
+    
+    /// Tooltip for photo mode (flat date hierarchy + timestamp filenames).
+    static let photoHelp =
+        "Example output:\n\(IngestMode.photoOutputExample)\n\nDoes not group sequences. Each file goes under Year/Month/Day and is renamed to its capture date, time, and milliseconds."
+}
+
+private enum IngestModeUserDefaults {
+    static let key = "ingestMode"
+}
+
 class RenameViewModel: ObservableObject {
     @Published var sourceURL: URL?
     @Published var outputURL: URL? {
@@ -42,10 +76,17 @@ class RenameViewModel: ObservableObject {
     @Published var showCompletionAlert: Bool = false
     @Published var completionMessage: String = ""
     @Published var completionFolderURL: URL?
-    /// After-ingest copy check: `.none` matches legacy `copyItem`-only behavior.
-    @Published var copyVerificationMode: CopyVerificationMode = .none {
+    /// After-ingest copy check. Default is **Full**; **None** matches legacy `copyItem`-only behavior.
+    @Published var copyVerificationMode: CopyVerificationMode = .full {
         didSet {
             UserDefaults.standard.set(copyVerificationMode.rawValue, forKey: CopyVerificationMode.userDefaultsKey)
+        }
+    }
+    
+    /// Sequence mode preserves existing behavior; photo mode uses Year/Month/Day folders and timestamp filenames only.
+    @Published var ingestMode: IngestMode = .sequence {
+        didSet {
+            UserDefaults.standard.set(ingestMode.rawValue, forKey: IngestModeUserDefaults.key)
         }
     }
     
@@ -253,6 +294,7 @@ class RenameViewModel: ObservableObject {
         
         // Calculate median interval
         let sortedIntervals = intervals.sorted()
+        guard !sortedIntervals.isEmpty else { return nil }
         let medianIndex = sortedIntervals.count / 2
         return sortedIntervals[medianIndex]
     }
@@ -342,66 +384,97 @@ class RenameViewModel: ObservableObject {
                 let derivedYear = Calendar.current.component(.year, from: filesToProcess[0].date)
                 firstYear = derivedYear
                 
-                await MainActor.run {
-                    self.progressDetail = "Preparing sequences…"
-                }
+                let mode = await MainActor.run { self.ingestMode }
                 
-                // Determine sequence breaks if auto-split is enabled
-                var sequenceBreaks: [Int] = [0]
-                if self.autoSplit {
-                    if let normalInterval = self.detectNormalInterval(in: filesToProcess) {
-                        sequenceBreaks = self.findSequenceBreaks(in: filesToProcess, normalInterval: normalInterval)
+                if mode == .photo {
+                    await MainActor.run {
+                        self.progressDetail = "Copying into date folders…"
                     }
-                }
-                
-                // Copy phase: linear progress metadataWeight … 1.0, updated after each file copied
-                var filesCopied = 0
-                let wCopy = Self.copyProgressWeight
-                
-                // Process each sequence
-                var didProcessFullSequence = false
-                for i in 0..<sequenceBreaks.count {
-                    if Task.isCancelled { break }
-                    
-                    let startIndex = sequenceBreaks[i]
-                    let endIndex = i < sequenceBreaks.count - 1 ? sequenceBreaks[i + 1] : filesToProcess.count
-                    let sequenceFiles = Array(filesToProcess[startIndex..<endIndex])
-                    
-                    // Sequences smaller than min size go to Extras (see README)
-                    if sequenceFiles.count < self.minSequenceSize {
-                        hasExtras = true
-                        try await self.copySmallSequenceToExtras(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy, verificationMode: verificationMode)
-                        continue
-                    }
-                    
-                    try await self.processSequence(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy, verificationMode: verificationMode)
-                    didProcessFullSequence = true
-                }
-                
-                // Set completion message and folder URL
-                let yearForCompletion = firstYear
-                let hasExtrasSnapshot = hasExtras
-                let didProcessFullSequenceSnapshot = didProcessFullSequence
-                await MainActor.run {
-                    guard let year = yearForCompletion else {
-                        self.completionMessage = "Ingest finished."
-                        self.completionFolderURL = nil
+                    var filesCopied = 0
+                    let wCopy = Self.copyProgressWeight
+                    try await self.processPhotoModeFiles(
+                        filesToProcess,
+                        in: outputURL,
+                        totalFileCount: totalFileCount,
+                        filesCopied: &filesCopied,
+                        wMeta: wMeta,
+                        wCopy: wCopy,
+                        verificationMode: verificationMode
+                    )
+                    let yearForCompletion = firstYear
+                    await MainActor.run {
+                        if let year = yearForCompletion {
+                            self.completionMessage = "Ingest finished. Files were organized under Year/Month/Day with timestamp names (see the \(year) folder)."
+                            self.completionFolderURL = outputURL.appendingPathComponent("\(year)")
+                        } else {
+                            self.completionMessage = "Ingest finished."
+                            self.completionFolderURL = outputURL
+                        }
                         self.showCompletionAlert = true
                         self.shouldResetSourceURL = true
-                        return
                     }
-                    if hasExtrasSnapshot && didProcessFullSequenceSnapshot {
-                        self.completionMessage = "Ingest finished. Full sequences are in dated folders; sets with fewer than \(self.minSequenceSize) images are in Extras."
-                        self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
-                    } else if hasExtrasSnapshot {
-                        self.completionMessage = "Files were copied to Extras (each sequence had fewer than \(self.minSequenceSize) images)."
-                        self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
-                    } else {
-                        self.completionMessage = "Ingest has completed successfully to the \(year) folder"
-                        self.completionFolderURL = outputURL.appendingPathComponent("\(year)")
+                } else {
+                    await MainActor.run {
+                        self.progressDetail = "Preparing sequences…"
                     }
-                    self.showCompletionAlert = true
-                    self.shouldResetSourceURL = true
+                    
+                    // Determine sequence breaks if auto-split is enabled
+                    var sequenceBreaks: [Int] = [0]
+                    if self.autoSplit {
+                        if let normalInterval = self.detectNormalInterval(in: filesToProcess) {
+                            sequenceBreaks = self.findSequenceBreaks(in: filesToProcess, normalInterval: normalInterval)
+                        }
+                    }
+                    
+                    // Copy phase: linear progress metadataWeight … 1.0, updated after each file copied
+                    var filesCopied = 0
+                    let wCopy = Self.copyProgressWeight
+                    
+                    // Process each sequence
+                    var didProcessFullSequence = false
+                    for i in 0..<sequenceBreaks.count {
+                        if Task.isCancelled { break }
+                        
+                        let startIndex = sequenceBreaks[i]
+                        let endIndex = i < sequenceBreaks.count - 1 ? sequenceBreaks[i + 1] : filesToProcess.count
+                        let sequenceFiles = Array(filesToProcess[startIndex..<endIndex])
+                        
+                        // Sequences smaller than min size go to Extras (see README)
+                        if sequenceFiles.count < self.minSequenceSize {
+                            hasExtras = true
+                            try await self.copySmallSequenceToExtras(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy, verificationMode: verificationMode)
+                            continue
+                        }
+                        
+                        try await self.processSequence(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy, verificationMode: verificationMode)
+                        didProcessFullSequence = true
+                    }
+                    
+                    // Set completion message and folder URL
+                    let yearForCompletion = firstYear
+                    let hasExtrasSnapshot = hasExtras
+                    let didProcessFullSequenceSnapshot = didProcessFullSequence
+                    await MainActor.run {
+                        guard let year = yearForCompletion else {
+                            self.completionMessage = "Ingest finished."
+                            self.completionFolderURL = nil
+                            self.showCompletionAlert = true
+                            self.shouldResetSourceURL = true
+                            return
+                        }
+                        if hasExtrasSnapshot && didProcessFullSequenceSnapshot {
+                            self.completionMessage = "Ingest finished. Full sequences are in dated folders; sets with fewer than \(self.minSequenceSize) images are in Extras."
+                            self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
+                        } else if hasExtrasSnapshot {
+                            self.completionMessage = "Files were copied to Extras (each sequence had fewer than \(self.minSequenceSize) images)."
+                            self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
+                        } else {
+                            self.completionMessage = "Ingest has completed successfully to the \(year) folder"
+                            self.completionFolderURL = outputURL.appendingPathComponent("\(year)")
+                        }
+                        self.showCompletionAlert = true
+                        self.shouldResetSourceURL = true
+                    }
                 }
             } catch {
                 print("Error during renaming: \(error)")
@@ -640,9 +713,31 @@ class RenameViewModel: ObservableObject {
     }
     
     func openCompletionFolder() {
-        if let url = completionFolderURL {
-            NSWorkspace.shared.open(url)
+        guard let folder = completionFolderURL else { return }
+        
+        // Ingest ends with `stopAccessingSecurityScopedResource()` on the output URL. App Sandbox
+        // requires scoped access again before `NSWorkspace` can open paths under a user-selected folder.
+        let accessingOutput = outputURL?.startAccessingSecurityScopedResource() ?? false
+        let accessingFolder = folder.startAccessingSecurityScopedResource()
+        defer {
+            if accessingFolder {
+                folder.stopAccessingSecurityScopedResource()
+            }
+            if accessingOutput {
+                outputURL?.stopAccessingSecurityScopedResource()
+            }
         }
+        
+        let fm = FileManager.default
+        var urlToOpen = folder
+        if !fm.fileExists(atPath: urlToOpen.path), let output = outputURL, fm.fileExists(atPath: output.path) {
+            urlToOpen = output
+        }
+        
+        if NSWorkspace.shared.open(urlToOpen) {
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([urlToOpen])
     }
     
     /// Copies files from short sequences into `Output/YYYY/Extras/` using `yyyyMMdd-HHmmss` names (README).
@@ -675,6 +770,10 @@ class RenameViewModel: ObservableObject {
                 collision += 1
             }
             let name = destURL.lastPathComponent
+            let upcoming = filesCopied + 1
+            await MainActor.run {
+                self.progressDetail = "Copying \(upcoming) / \(totalFileCount): \(fileInfo.url.lastPathComponent)…"
+            }
             try await VerifiedFileCopy.copyWithVerification(from: fileInfo.url, to: destURL, mode: verificationMode)
             filesCopied += 1
             let copiedCount = filesCopied
@@ -742,6 +841,10 @@ class RenameViewModel: ObservableObject {
             let newName = "\(baseNameWithUnderscore)\(paddedNumber).\(fileExtension)"
             let destinationURL = baseFolderURL.appendingPathComponent(newName)
             let writtenName = destinationURL.lastPathComponent
+            let upcoming = filesCopied + 1
+            await MainActor.run {
+                self.progressDetail = "Copying \(upcoming) / \(totalFileCount): \(fileURL.lastPathComponent)…"
+            }
             try await VerifiedFileCopy.copyWithVerification(from: fileURL, to: destinationURL, mode: verificationMode)
             currentNumber += 1
             if idx == 0 { sequenceFolderURL = baseFolderURL }
@@ -769,6 +872,74 @@ class RenameViewModel: ObservableObject {
         if let raw = UserDefaults.standard.string(forKey: CopyVerificationMode.userDefaultsKey),
            let mode = CopyVerificationMode(rawValue: raw) {
             copyVerificationMode = mode
+        }
+        if let raw = UserDefaults.standard.string(forKey: IngestModeUserDefaults.key),
+           let mode = IngestMode(rawValue: raw) {
+            ingestMode = mode
+        }
+    }
+    
+    /// Photo mode: `Output/YYYY/MM/DD/yyyy-MM-dd-HHmmss-SSS.ext` (adds `_2`, `_3`, … if the name still collides).
+    private func photoModeTimestampBase(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        let baseString = formatter.string(from: date)
+        let milliseconds = Int((date.timeIntervalSince1970.truncatingRemainder(dividingBy: 1)) * 1000)
+        return "\(baseString)-\(String(format: "%03d", milliseconds))"
+    }
+    
+    /// Copies each file into year/month/day folders with a timestamp-based filename (no sequence grouping).
+    private func processPhotoModeFiles(
+        _ files: [(url: URL, date: Date)],
+        in outputURL: URL,
+        totalFileCount: Int,
+        filesCopied: inout Int,
+        wMeta: Double,
+        wCopy: Double,
+        verificationMode: CopyVerificationMode
+    ) async throws {
+        let fileManager = FileManager.default
+        let calendar = Calendar.current
+        
+        for fileInfo in files {
+            if Task.isCancelled { break }
+            let fileURL = fileInfo.url
+            let date = fileInfo.date
+            let year = calendar.component(.year, from: date)
+            let month = calendar.component(.month, from: date)
+            let day = calendar.component(.day, from: date)
+            let monthStr = String(format: "%02d", month)
+            let dayStr = String(format: "%02d", day)
+            
+            let dayFolder = outputURL
+                .appendingPathComponent("\(year)")
+                .appendingPathComponent(monthStr)
+                .appendingPathComponent(dayStr)
+            try fileManager.createDirectory(at: dayFolder, withIntermediateDirectories: true)
+            
+            let baseStamp = photoModeTimestampBase(from: date)
+            let ext = fileURL.pathExtension
+            var destURL = dayFolder.appendingPathComponent("\(baseStamp).\(ext)")
+            var collision = 2
+            while fileManager.fileExists(atPath: destURL.path) {
+                destURL = dayFolder.appendingPathComponent("\(baseStamp)_\(collision).\(ext)")
+                collision += 1
+            }
+            let writtenName = destURL.lastPathComponent
+            let upcoming = filesCopied + 1
+            await MainActor.run {
+                self.progressDetail = "Copying \(upcoming) / \(totalFileCount): \(fileURL.lastPathComponent)…"
+            }
+            try await VerifiedFileCopy.copyWithVerification(from: fileURL, to: destURL, mode: verificationMode)
+            filesCopied += 1
+            let copiedCount = filesCopied
+            let p = wMeta + wCopy * Double(copiedCount) / Double(max(totalFileCount, 1))
+            await MainActor.run {
+                self.progress = min(1.0, p)
+                self.progressDetail = "Copying \(copiedCount) / \(totalFileCount): → \(writtenName)"
+            }
         }
     }
 } 

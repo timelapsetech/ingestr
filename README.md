@@ -1,20 +1,21 @@
 # Ingestr
 
-A modern macOS application for ingesting and organizing image sequences. Ingestr automatically organizes your images into date-based folders and handles sequence detection and naming.
+A modern macOS application for ingesting and organizing images. Use **sequence mode** for time-lapse and shot groups, or **photo mode** to file every image by capture date into year/month/day folders with a timestamped name.
 
-**Current release:** 1.3 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
+**Current release:** 1.4 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ![Ingestr Application](Ingestr/Resources/app_screenshot.png)
 
 ## Features
 
+- **Sequence mode or Photo mode**: **Sequence mode** (default) detects sequences, supports auto rename, split, and Extras. **Photo mode** skips sequence logic and writes each file to `Year/Month/Day` with a `yyyy-MM-dd-HHmmss-SSS` filename from capture time.
 - **Smart Sequence Detection**: Automatically detects and organizes image sequences based on capture time
 - **Auto Rename**: Uses EXIF date from images to create organized folder structures
 - **Auto Split**: Automatically splits sequences when significant time gaps are detected
 - **Extras Handling**: Small sequences (< 10 images) are automatically moved to an "Extras" folder
 - **Clean, Modern Interface**: Drag-and-drop UI with native macOS controls
 - **File Extension Filtering**: Filter files by extension (e.g., "jpg", "raw")
-- **Progress Tracking**: Real-time progress monitoring for large batches
+- **Progress Tracking**: Real-time progress monitoring for large batches; copy phase names the active file before long full-verification runs
 - **Dark/Light Mode Support**: Automatically adapts to your macOS appearance settings
 - **Add to Existing**: When enabled, the app will detect the last number in an existing image sequence in the destination and continue numbering from there, matching the zero-padding of existing files. This is useful for appending new images to an already-ingested sequence without overwriting or duplicating numbers.
 
@@ -58,6 +59,12 @@ For distribution without that prompt, maintainers should archive with a **Develo
 
 ### Options Explained
 
+#### Ingest mode (Sequence vs Photo)
+- **Sequence mode**: Same behavior as previous releases—images are grouped into sequences by capture time; small sets may go to **Extras**; **Rename Options** below apply.
+- **Photo mode**: Does not build sequences. Each matching file is copied to **`Output/YYYY/MM/DD/`** (zero-padded month and day) and renamed to **`yyyy-MM-dd-HHmmss-SSS.ext`** using EXIF (or file date as fallback). Milliseconds keep names unique; if a name still exists, `_2`, `_3`, … are appended before the extension. **Rename Options** that only apply to sequences (Auto Rename, Auto Split, Add to Existing, Base Name, padding, start number) are disabled in photo mode. **Copy verification** still applies.
+
+Hover each mode in the app for an example output path in the tooltip.
+
 #### File Extension Filter
 - Enter a file extension (e.g., "jpg", "raw") to only process files with that extension
 - Leave empty to process all files
@@ -75,11 +82,14 @@ For distribution without that prompt, maintainers should archive with a **Develo
 - Automatically detects time gaps between images
 - Creates new sequences when a significant time gap is detected
 - Helps organize photos from different shooting sessions
+- If every gap is filtered out (for example identical capture timestamps), ingest continues as **one** sequence instead of stopping with an error
 
 #### Copy verification
-- **None** (default): copies files with the system copy API only—the same as previous releases.
-- **Full**: streams each file while hashing, then hashes the destination to confirm a byte-for-byte match (extra disk read of the written file).
+- **Full** (default): streams each file while hashing, then hashes the destination to confirm a byte-for-byte match (extra disk read of the written file).
+- **None**: copies files with the system copy API only—fastest; same as early releases when verification was not offered.
 - **Size only**: after copy, compares source and destination file sizes (very low overhead; does not detect same-size corruption).
+
+Your choice is saved between launches. Existing installs that already saved **None** or **Size only** keep that setting until you change it.
 
 #### Base Name
 - Only available when Auto Rename is disabled
@@ -99,7 +109,7 @@ For distribution without that prompt, maintainers should archive with a **Develo
 
 ### Output Structure
 
-The app creates the following folder structure:
+**Sequence mode** creates:
 
 ```
 Output Directory/
@@ -116,12 +126,23 @@ Output Directory/
         └── ...
 ```
 
+**Photo mode** creates (example):
+
+```
+Output Directory/
+└── YYYY/
+    └── MM/
+        └── DD/
+            ├── yyyy-MM-dd-HHmmss-SSS.jpg
+            └── ...
+```
+
 ### Completion
 
 After ingesting completes:
-- If all images were organized into sequences, you'll see a message indicating success
-- If any images were moved to the Extras folder, you'll be notified
-- You can click "Open Folder" to view the results in Finder
+- **Sequence mode:** If all images were organized into sequences, you'll see a message indicating success; if any images were moved to the Extras folder, you'll be notified
+- **Photo mode:** Completion opens the relevant year folder when applicable
+- You can click **Open Folder** to view the results in Finder (the app restores sandbox access to your chosen destination so Finder can open it after ingest)
 
 ## Development
 

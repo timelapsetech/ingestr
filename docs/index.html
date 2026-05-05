@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ingestr — Rename and sort image sequences automatically</title>
-  <meta name="description" content="Ingestr is a simple macOS app for photographers who shoot image sequences. Drag folders, set options, and ingest thousands of stills into dated, numbered folders—with optional copy verification so you can trust every file landed correctly.">
+  <meta name="description" content="Ingestr is a simple macOS app for photographers who shoot image sequences or card dumps. Drag folders, choose sequence mode or photo-by-date mode, and ingest thousands of stills—with copy verification that defaults to a full byte-for-byte check (optional lighter modes for speed).">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -26,17 +26,17 @@
       <div class="wrap">
         <h1>Sort and rename image sequences—the easy way</h1>
         <p class="tagline">
-          Ingestr is a focused macOS app for anyone who shoots hundreds or thousands of stills (time lapse, bursts, or card dumps) and needs them renamed and organized into clear, dated folders—without a spreadsheet or manual numbering. Built-in <strong>copy verification</strong> lets you optionally check that each file copied correctly, from a quick size check up to a full byte-for-byte pass.
+          Ingestr is a focused macOS app for anyone who shoots hundreds or thousands of stills (time lapse, bursts, or card dumps) and needs them organized fast. Use <strong>sequence mode</strong> for numbered CO folders and Extras, or <strong>photo mode</strong> to drop every file into year/month/day folders with a timestamped name—no sequence detection. <strong>Copy verification</strong> defaults to a full byte-for-byte check after copy; you can switch to size-only or none for speed on huge batches.
         </p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="https://github.com/timelapsetech/ingestr/releases/latest/download/Ingestr.zip">Download for macOS</a>
           <a class="btn btn-secondary" href="https://github.com/timelapsetech/ingestr">Source on GitHub</a>
         </div>
-        <p class="hero-meta">Requires macOS 12 or later · Current release 1.3</p>
+        <p class="hero-meta">Requires macOS 12 or later · Current release 1.4</p>
 
         <div id="app" class="app-preview">
           <p class="lead app-preview-lead">
-            Pick a source folder and an output folder, choose how files should be named, and start ingesting. The window stays responsive on large jobs, with a clear progress bar and per-step status while metadata is read and files are copied. Under <strong>Rename Options</strong>, set <strong>Copy verification</strong> to match how careful you want to be—default stays fast; stronger modes help ensure nothing was lost in transit.
+            Pick a source folder and an output folder, choose how files should be named, and start ingesting. The window stays responsive on large jobs, with a clear progress bar and per-step status while metadata is read and files are copied. Under <strong>Rename Options</strong>, <strong>Copy verification</strong> defaults to <strong>Full</strong> for confidence every file landed correctly; choose <strong>None</strong> or <strong>Size only</strong> when you want maximum speed on very large runs.
           </p>
           <figure class="figure">
             <img src="images/Ingestr_1_2_screenshot.png" alt="Ingestr main window showing source and output directories, file extension filter, rename options, and Start Ingesting button">
@@ -54,9 +54,13 @@
       <div class="wrap">
         <h2 id="features-heading">What Ingestr does for you</h2>
         <p class="lead">
-          The app is deliberately simple: it is built around sequence detection, consistent naming, and a predictable folder layout—so you spend less time housekeeping and more time editing.
+          The app is deliberately simple: pick <strong>sequence mode</strong> when you want batches grouped by capture time, or <strong>photo mode</strong> when you only need a dated folder tree and unique timestamp filenames—then spend less time housekeeping and more time editing.
         </p>
         <div class="grid">
+          <article class="card">
+            <h3>Sequence or photo mode</h3>
+            <p>Sequence mode keeps the classic workflow: detection, auto rename, split, Extras, add to existing. Photo mode skips grouping and writes <code>Year/Month/Day</code> plus <code>yyyy-MM-dd-HHmmss-SSS</code> names from capture time.</p>
+          </article>
           <article class="card">
             <h3>Smart sequence detection</h3>
             <p>Groups images that belong together based on capture time, so multi-session card dumps can be split sensibly when you want them to be.</p>
@@ -67,7 +71,7 @@
           </article>
           <article class="card">
             <h3>Auto split sequences</h3>
-            <p>When auto rename is on, detect large time gaps and start a new sequence—useful when one folder contains more than one shoot.</p>
+            <p>When auto rename is on, detect large time gaps and start a new sequence—useful when one folder contains more than one shoot. If shots don’t produce a usable cadence (for example identical timestamps), ingest continues sensibly as one sequence.</p>
           </article>
           <article class="card">
             <h3>Extras folder</h3>
@@ -83,7 +87,7 @@
           </article>
           <article class="card">
             <h3>Copy verification</h3>
-            <p>Optional checks when files are copied to the destination: leave it off for the same speed as before, compare sizes for a light sanity check, or use full verification when you need confidence every byte matches.</p>
+            <p>Defaults to full byte-for-byte verification after copy; optional size-only or no verification when you need speed on huge batches. Your choice is saved.</p>
           </article>
         </div>
       </div>

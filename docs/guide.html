@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>How to use Ingestr — options and output layout</title>
-  <meta name="description" content="How to ingest folders, configure rename options, extension filters, Add to Existing, and understand the year and sequence folder structure on disk.">
+  <meta name="description" content="How to ingest folders, choose sequence or photo mode, configure rename options, extension filters, Add to Existing, and understand output folder layouts on disk.">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -34,19 +34,26 @@
           <li><strong>Launch Ingestr</strong> on your Mac (macOS 12 or later).</li>
           <li><strong>Source directory:</strong> Drag a folder onto the Source area, or click the zone to choose a folder. This is where your images (or nested folders of images) live.</li>
           <li><strong>Output directory:</strong> Drag or choose where organized sequences should be written.</li>
-          <li><strong>Options:</strong> Set the file extension filter and rename options (explained below).</li>
+          <li><strong>Options:</strong> Choose <strong>Sequence mode</strong> or <strong>Photo mode</strong>, set the file extension filter, and configure rename options when using sequence mode (explained below).</li>
           <li><strong>Start Ingesting:</strong> The app shows progress and detail while it works. You can cancel an in-progress run.</li>
           <li><strong>When finished:</strong> Use <strong>Open Folder</strong> in the completion alert to reveal the result in Finder.</li>
         </ol>
+        <p class="note">If nothing seemed to happen when choosing <strong>Open Folder</strong> in older builds, update to the latest release: the app restores sandbox access to your output folder briefly so Finder can open it after ingest finishes.</p>
       </div>
     </section>
 
     <section id="options" aria-labelledby="options-heading">
       <div class="wrap">
         <h2 id="options-heading">Options explained</h2>
-        <p class="lead">These match the labels in the app’s <strong>Rename Options</strong> section.</p>
+        <p class="lead">Options under <strong>Ingest mode</strong> apply to every ingest; <strong>Rename Options</strong> apply to <strong>Sequence mode</strong> only (they are disabled in Photo mode).</p>
 
         <dl class="dl-options">
+          <dt>Ingest mode</dt>
+          <dd>
+            <p><strong>Sequence mode</strong> (default): Groups images into sequences by capture time, uses the rename options below, and may place small sets in <strong>Extras</strong>. Hover the control for an example path in the tooltip.</p>
+            <p><strong>Photo mode</strong>: Does not detect sequences. Each file is written under <code>Output/Year/Month/Day/</code> with a filename <code>yyyy-MM-dd-HHmmss-SSS</code> plus extension, using EXIF date when available (milliseconds keep names unique). Hover for an example.</p>
+          </dd>
+
           <dt>File extension</dt>
           <dd>
             Enter an extension (for example <code>jpg</code> or <code>raw</code>) to process only files with that extension.
@@ -64,6 +71,7 @@
           <dd>
             Available when <strong>Auto Rename</strong> is on. Detects significant time gaps between shots and starts a new sequence instead of lumping everything into one run.
             Helpful when one folder contains images from more than one session.
+            If every gap is filtered out (for example identical capture timestamps), ingest continues as a single sequence instead of failing.
           </dd>
 
           <dt>Add to Existing</dt>
@@ -74,9 +82,10 @@
 
           <dt>Copy verification</dt>
           <dd>
-            <strong>None</strong> (default) uses the same copy behavior as earlier releases—no extra checks.
-            <strong>Full</strong> copies in a streaming pass while computing a SHA-256 digest, then reads the destination once to confirm the bytes match (strongest check; slower on very large batches).
+            <strong>Full</strong> (default) copies in a streaming pass while computing a SHA-256 digest, then reads the destination once to confirm the bytes match (strongest check; slower on very large batches).
+            <strong>None</strong> uses the system copy API only—fastest; no extra checks (matches behavior before verification existed).
             <strong>Size only</strong> compares file sizes after copy (minimal overhead; does not catch corruption when sizes still match).
+            The selection is remembered; if you upgraded from a release that defaulted to None, your saved preference is unchanged until you pick another mode.
           </dd>
 
           <dt>Base Name</dt>
@@ -101,9 +110,11 @@
       <div class="wrap">
         <h2 id="output-heading">Output folder layout</h2>
         <p class="lead">
-          With <strong>Auto Rename</strong>, Ingestr organizes output under a year folder, then per-sequence folders. Small or non-sequential groups may go to <strong>Extras</strong>.
+          <strong>Sequence mode:</strong> With <strong>Auto Rename</strong>, output goes under a year folder, then per-sequence folders. Small or non-sequential groups may go to <strong>Extras</strong>.
+          <strong>Photo mode:</strong> Output is <code>Year/Month/Day</code> with timestamp filenames—no sequence folders or Extras.
         </p>
-        <pre class="structure" role="img" aria-label="Example output folder tree">Output Directory/
+        <h3>Sequence mode (example)</h3>
+        <pre class="structure" role="img" aria-label="Example sequence mode output folder tree">Output Directory/
 └── YYYY/
     ├── YYYYMMDD1CO_/
     │   ├── YYYYMMDD1CO_0001.jpg
@@ -114,6 +125,13 @@
     └── Extras/
         ├── YYYYMMDD-HHMMSS.jpg
         └── ...</pre>
+        <h3>Photo mode (example)</h3>
+        <pre class="structure" role="img" aria-label="Example photo mode output folder tree">Output Directory/
+└── YYYY/
+    └── MM/
+        └── DD/
+            ├── yyyy-MM-dd-HHmmss-SSS.jpg
+            └── ...</pre>
       </div>
     </section>
 
