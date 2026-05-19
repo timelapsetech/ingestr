@@ -15,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.4</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>6</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
@@ -28,7 +28,7 @@
 		<true/>
 	</dict>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2024 Time Lapse Technologies. All rights reserved.</string>
+	<string>Copyright © 2025 Time Lapse Technologies. All rights reserved.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ingestr needs access to your photos to read image metadata for date-based file naming.</string>
 </dict>

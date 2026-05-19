@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.5] - 2026-05-18
+
+### Added
+- **Metadata on copy:** After each ingest copy, Finder **created** and **modified** dates are restored from the source file, and macOS extended attributes are copied. Byte-identical copies (including **Full** verification) still preserve embedded metadata such as EXIF inside the file.
+- Unit tests for source-folder grouping, auto-split gap logic, sequence folder index parsing, and copy metadata preservation.
+
+### Fixed
+- **Sequence ingest (Auto Rename + Auto Split):** Files under separate source subfolders are grouped and split per shoot instead of one global timeline, so multiple timelapses on a card are less likely to be merged or sent to Extras incorrectly.
+- **Auto Split:** Cadence-aware split thresholds—fast timelapses (3–30s spacing) stay together unless there is a **10+ minute** gap; slower sequencers (up to ~2 min per frame) split on shorter session pauses.
+- **Auto Rename:** Sequence folder index `N` in `YYYYMMDDNCO` supports multi-digit values (e.g. `…10CO`) and tracks indices assigned during the same ingest run.
+- **Output folder permissions:** Verifies sandbox write access to the **output** directory before copying; captures security-scoped bookmarks when you pick or drop folders; clearer errors label the **destination** path (including when creating `Extras`).
+- **Open Folder:** Reveal in Finder uses the output security-scoped bookmark, `activateFileViewerSelecting`, and the last ingested or year folder (not only Extras when sequences were also written).
+- **Build:** Added missing utility sources to the Xcode target (`DirectoryBookmark`, `IngestFilesystemError`) and resolved Swift 6 concurrency warnings for reveal-folder tracking during ingest.
+
 ## [1.4] - 2026-05-04
 ### Added
 - **Ingest mode** on the main window: choose **Sequence mode** (existing behavior—detect sequences, Extras, auto rename, add to existing) or **Photo mode** (no sequence grouping). Photo mode places each file under `Output/Year/Month/Day/` and renames it to a capture-time stamp `yyyy-MM-dd-HHmmss-SSS` (with collision suffixes if needed). Tooltips on each mode summarize an example path.
@@ -51,8 +67,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Various edge cases in sequence detection and file naming.
 
 ## [1.0] - 2025-05-17
-- Initial release.
-
 ### Added
 - Initial release
 - Smart sequence detection
@@ -63,6 +77,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Progress tracking
 - Dark/Light mode support
 - Modern drag-and-drop interface
-
-### Known Issues
-- None at this time 

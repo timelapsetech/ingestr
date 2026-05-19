@@ -39,7 +39,7 @@ enum IngestMode: String, CaseIterable, Identifiable {
     
     /// Tooltip for sequence mode (full ingest behavior).
     static let sequenceHelp =
-        "Example output:\n\(IngestMode.sequenceOutputExample)\n\nDetects sequences by capture time, splits on gaps when enabled, and moves small sets to Extras."
+        "Example output:\n\(IngestMode.sequenceOutputExample)\n\nEach folder under the source is ingested separately. Auto Split keeps fast timelapses (3–30s cadence) together unless there is a 10+ minute gap; slower sequencers (up to ~2 min per frame) split on shorter session pauses. Sets with fewer than 10 images go to Extras."
     
     /// Tooltip for photo mode (flat date hierarchy + timestamp filenames).
     static let photoHelp =
@@ -50,12 +50,27 @@ private enum IngestModeUserDefaults {
     static let key = "ingestMode"
 }
 
+private enum DirectoryBookmarkKey {
+    static let output = "outputDirectoryBookmark"
+    static let source = "sourceDirectoryBookmark"
+}
+
 class RenameViewModel: ObservableObject {
-    @Published var sourceURL: URL?
+    @Published var sourceURL: URL? {
+        didSet {
+            if let url = sourceURL {
+                DirectoryBookmark.captureUserSelectedDirectory(url, key: DirectoryBookmarkKey.source)
+            } else {
+                DirectoryBookmark.clear(key: DirectoryBookmarkKey.source)
+            }
+        }
+    }
     @Published var outputURL: URL? {
         didSet {
             if let url = outputURL {
-                UserDefaults.standard.set(url.path, forKey: "lastOutputDirectory")
+                DirectoryBookmark.captureUserSelectedDirectory(url, key: DirectoryBookmarkKey.output)
+            } else {
+                DirectoryBookmark.clear(key: DirectoryBookmarkKey.output)
             }
         }
     }
@@ -90,8 +105,13 @@ class RenameViewModel: ObservableObject {
         }
     }
     
-    // Constants for auto-split
-    private let defaultGapThreshold: TimeInterval = 60 // 1 minute
+    // Constants for auto-split (cadence 3–120s typical; session breaks often 10+ minutes)
+    /// When estimating shot cadence, ignore gaps longer than this (they are session breaks, not frame spacing).
+    private let maxCadenceSample: TimeInterval = 180
+    /// Gaps at or above this always start a new sequence (between shooting sessions).
+    private let minimumSessionGap: TimeInterval = 600 // 10 minutes
+    /// For medium cadence (tens of seconds between frames), split when a pause exceeds this and 5× median.
+    private let minimumAdaptiveGap: TimeInterval = 180 // 3 minutes
     private let minImagesForGapDetection: Int = 3 // Minimum images needed to detect normal interval
     private let minSequenceSize: Int = 10 // Minimum number of images to consider a sequence
     /// Share of the bar used while reading EXIF/metadata (rest is copy).
@@ -192,6 +212,7 @@ class RenameViewModel: ObservableObject {
         
         let finish: (NSApplication.ModalResponse) -> Void = { response in
             guard response == .OK, let url = panel.url else { return }
+            _ = url.startAccessingSecurityScopedResource()
             DispatchQueue.main.async {
                 onPicked(url)
             }
@@ -235,77 +256,117 @@ class RenameViewModel: ObservableObject {
         }
     }
     
-    private func getNextSequenceNumber(for date: Date, in outputURL: URL) -> Int {
+    /// Parses the numeric index from a sequence folder name such as `202505041CO` or `2025050412CO`.
+    func parseSequenceIndex(fromFolderName folderName: String, datePrefix: String) -> Int? {
+        guard folderName.hasPrefix(datePrefix), folderName.hasSuffix("CO") else { return nil }
+        let indexPart = folderName.dropFirst(datePrefix.count).dropLast(2)
+        guard !indexPart.isEmpty, indexPart.allSatisfy(\.isNumber) else { return nil }
+        return Int(indexPart)
+    }
+    
+    private func highestSequenceIndexOnDisk(for dateString: String, year: Int, in outputURL: URL) -> Int {
+        let fileManager = FileManager.default
+        let yearFolder = outputURL.appendingPathComponent("\(year)")
+        guard fileManager.fileExists(atPath: yearFolder.path),
+              let contents = try? fileManager.contentsOfDirectory(at: yearFolder, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            return 0
+        }
+        return contents.compactMap { url -> Int? in
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+                return nil
+            }
+            return parseSequenceIndex(fromFolderName: url.lastPathComponent, datePrefix: dateString)
+        }.max() ?? 0
+    }
+    
+    /// Next `N` for `YYYYMMDDNCO_`, considering existing output folders and sequences already created in this run.
+    private func getNextSequenceNumber(
+        for date: Date,
+        in outputURL: URL,
+        assignedInRun: inout [String: Int]
+    ) -> Int {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd"
         let dateString = formatter.string(from: date)
+        let year = Calendar.current.component(.year, from: date)
+        let runKey = "\(year)-\(dateString)"
         
-        do {
-            let fileManager = FileManager.default
-            let year = Calendar.current.component(.year, from: date)
-            let yearFolder = outputURL.appendingPathComponent("\(year)")
-            
-            // Check if year folder exists
-            guard fileManager.fileExists(atPath: yearFolder.path) else {
-                return 1
-            }
-            
-            // Get all folders in the year directory
-            let contents = try fileManager.contentsOfDirectory(at: yearFolder, includingPropertiesForKeys: nil)
-            
-            // Filter for folders matching the pattern YYYYMMDDXCO
-            let sequenceFolders = contents.filter { url in
-                let folderName = url.lastPathComponent
-                return folderName.hasPrefix(dateString) && 
-                       folderName.hasSuffix("CO") &&
-                       folderName.count == dateString.count + 3 // YYYYMMDD + X + CO
-            }
-            
-            if sequenceFolders.isEmpty {
-                return 1
-            }
-            
-            // Extract sequence numbers and find the highest
-            let sequenceNumbers = sequenceFolders.compactMap { url -> Int? in
-                let folderName = url.lastPathComponent
-                let startIndex = folderName.index(folderName.startIndex, offsetBy: dateString.count)
-                let endIndex = folderName.index(folderName.endIndex, offsetBy: -2) // Remove "CO"
-                let numberStr = String(folderName[startIndex..<endIndex])
-                return Int(numberStr)
-            }
-            
-            return (sequenceNumbers.max() ?? 0) + 1
-        } catch {
-            print("Error checking sequence numbers: \(error)")
-            return 1
-        }
+        let maxOnDisk = highestSequenceIndexOnDisk(for: dateString, year: year, in: outputURL)
+        let maxInRun = assignedInRun[runKey] ?? 0
+        let next = max(maxOnDisk, maxInRun) + 1
+        assignedInRun[runKey] = next
+        return next
     }
     
-    private func detectNormalInterval(in files: [(url: URL, date: Date)]) -> TimeInterval? {
+    /// Parent path of a file relative to the source root (e.g. `ShootA` or `ShootA/nested`). Empty for files at the source root.
+    func sourceRelativeGroupKey(for fileURL: URL, sourceRoot: URL) -> String {
+        let rootPath = sourceRoot.standardizedFileURL.path
+        let filePath = fileURL.standardizedFileURL.path
+        guard filePath.hasPrefix(rootPath) else { return "" }
+        var relative = String(filePath.dropFirst(rootPath.count))
+        if relative.hasPrefix("/") {
+            relative = String(relative.dropFirst())
+        }
+        return (relative as NSString).deletingLastPathComponent
+    }
+    
+    /// Groups files by their folder under the source root so each shoot folder is split and ingested independently.
+    func groupFilesBySourceFolder(
+        _ files: [(url: URL, date: Date)],
+        sourceRoot: URL
+    ) -> [String: [(url: URL, date: Date)]] {
+        var groups: [String: [(url: URL, date: Date)]] = [:]
+        for file in files {
+            let key = sourceRelativeGroupKey(for: file.url, sourceRoot: sourceRoot)
+            groups[key, default: []].append(file)
+        }
+        return groups
+    }
+    
+    func detectNormalInterval(in files: [(url: URL, date: Date)]) -> TimeInterval? {
         guard files.count >= minImagesForGapDetection else { return nil }
         
         var intervals: [TimeInterval] = []
         for i in 1..<files.count {
             let interval = files[i].date.timeIntervalSince(files[i-1].date)
-            if interval > 0 && interval < defaultGapThreshold * 2 { // Only consider reasonable intervals
+            // Sample only within-shoot spacing (roughly 3–120s, with headroom), not session-length gaps.
+            if interval > 0 && interval <= maxCadenceSample {
                 intervals.append(interval)
             }
         }
         
-        // Calculate median interval
         let sortedIntervals = intervals.sorted()
         guard !sortedIntervals.isEmpty else { return nil }
         let medianIndex = sortedIntervals.count / 2
         return sortedIntervals[medianIndex]
     }
     
-    private func findSequenceBreaks(in files: [(url: URL, date: Date)], normalInterval: TimeInterval) -> [Int] {
-        var breaks: [Int] = [0] // Start with first file
-        let gapThreshold = normalInterval * 3 // Consider it a break if gap is 3x normal interval
+    /// Split threshold from typical shot cadence: fast timelapses tolerate pauses up to ~10 minutes;
+    /// slower sequencers (tens of seconds per frame) split on shorter between-session gaps.
+    func sequenceSplitThreshold(for normalInterval: TimeInterval) -> TimeInterval {
+        if normalInterval <= 30 {
+            // ~3–30s between frames: require a session-length pause (≥10 min) before splitting.
+            return max(normalInterval * 5, minimumSessionGap)
+        }
+        if normalInterval <= 120 {
+            // ~30s–2 min between frames: split when pause is well above cadence (≥3 min floor).
+            return max(normalInterval * 5, minimumAdaptiveGap)
+        }
+        if normalInterval <= maxCadenceSample {
+            // Sparse but still sampled as in-shoot cadence.
+            return max(normalInterval * 3, minimumAdaptiveGap)
+        }
+        return max(normalInterval * 3, minimumSessionGap)
+    }
+    
+    func findSequenceBreaks(in files: [(url: URL, date: Date)], normalInterval: TimeInterval) -> [Int] {
+        var breaks: [Int] = [0]
+        let gapThreshold = sequenceSplitThreshold(for: normalInterval)
         
         for i in 1..<files.count {
             let interval = files[i].date.timeIntervalSince(files[i-1].date)
-            if interval > gapThreshold {
+            if interval >= minimumSessionGap || interval >= gapThreshold {
                 breaks.append(i)
             }
         }
@@ -314,7 +375,7 @@ class RenameViewModel: ObservableObject {
     }
     
     func startRenaming() {
-        guard let sourceURL = sourceURL, let outputURL = outputURL else { return }
+        guard let sourceStored = sourceURL, let outputStored = outputURL else { return }
         let verificationMode = copyVerificationMode
         isProcessing = true
         progress = 0
@@ -322,8 +383,10 @@ class RenameViewModel: ObservableObject {
         // Run off the main actor so enumeration and copies don't block UI updates (ProgressView would stay at 0%).
         currentOperation = Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            let accessingSource = sourceURL.startAccessingSecurityScopedResource()
-            let accessingOutput = outputURL.startAccessingSecurityScopedResource()
+            let sourceURL = DirectoryBookmark.resolve(stored: sourceStored, key: DirectoryBookmarkKey.source) ?? sourceStored
+            let outputURL = DirectoryBookmark.resolve(stored: outputStored, key: DirectoryBookmarkKey.output) ?? outputStored
+            let accessingSource = DirectoryBookmark.beginAccess(to: sourceURL)
+            let accessingOutput = DirectoryBookmark.beginAccess(to: outputURL)
             defer {
                 if accessingSource {
                     sourceURL.stopAccessingSecurityScopedResource()
@@ -333,7 +396,30 @@ class RenameViewModel: ObservableObject {
                 }
             }
             await Task.yield()
+            if !accessingSource {
+                await MainActor.run {
+                    self.completionMessage = IngestFilesystemError.sourceAccessDenied(sourceURL).localizedDescription
+                    self.completionFolderURL = nil
+                    self.showCompletionAlert = true
+                    self.isProcessing = false
+                    self.progress = 0
+                    self.progressDetail = ""
+                }
+                return
+            }
+            if !accessingOutput {
+                await MainActor.run {
+                    self.completionMessage = IngestFilesystemError.outputAccessDenied(outputURL).localizedDescription
+                    self.completionFolderURL = nil
+                    self.showCompletionAlert = true
+                    self.isProcessing = false
+                    self.progress = 0
+                    self.progressDetail = ""
+                }
+                return
+            }
             do {
+                try DirectoryBookmark.verifyCanWrite(to: outputURL)
                 let fileManager = FileManager.default
                 let enumerator = fileManager.enumerator(at: sourceURL,
                                                       includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey],
@@ -379,7 +465,6 @@ class RenameViewModel: ObservableObject {
                     }
                 }
                 
-                // Sort files by date
                 filesToProcess.sort { $0.date < $1.date }
                 let derivedYear = Calendar.current.component(.year, from: filesToProcess[0].date)
                 firstYear = derivedYear
@@ -392,7 +477,7 @@ class RenameViewModel: ObservableObject {
                     }
                     var filesCopied = 0
                     let wCopy = Self.copyProgressWeight
-                    try await self.processPhotoModeFiles(
+                    let latestRevealFolder = try await self.processPhotoModeFiles(
                         filesToProcess,
                         in: outputURL,
                         totalFileCount: totalFileCount,
@@ -405,10 +490,11 @@ class RenameViewModel: ObservableObject {
                     await MainActor.run {
                         if let year = yearForCompletion {
                             self.completionMessage = "Ingest finished. Files were organized under Year/Month/Day with timestamp names (see the \(year) folder)."
-                            self.completionFolderURL = outputURL.appendingPathComponent("\(year)")
+                            self.completionFolderURL = latestRevealFolder
+                                ?? outputURL.appendingPathComponent("\(year)")
                         } else {
                             self.completionMessage = "Ingest finished."
-                            self.completionFolderURL = outputURL
+                            self.completionFolderURL = latestRevealFolder ?? outputURL
                         }
                         self.showCompletionAlert = true
                         self.shouldResetSourceURL = true
@@ -418,42 +504,79 @@ class RenameViewModel: ObservableObject {
                         self.progressDetail = "Preparing sequences…"
                     }
                     
-                    // Determine sequence breaks if auto-split is enabled
-                    var sequenceBreaks: [Int] = [0]
-                    if self.autoSplit {
-                        if let normalInterval = self.detectNormalInterval(in: filesToProcess) {
-                            sequenceBreaks = self.findSequenceBreaks(in: filesToProcess, normalInterval: normalInterval)
-                        }
+                    var filesCopied = 0
+                    var latestRevealFolder: URL?
+                    let wCopy = Self.copyProgressWeight
+                    var didProcessFullSequence = false
+                    var assignedSequenceNumbers: [String: Int] = [:]
+                    func updateRevealFolder(_ folder: URL?) {
+                        if let folder { latestRevealFolder = folder }
                     }
                     
-                    // Copy phase: linear progress metadataWeight … 1.0, updated after each file copied
-                    var filesCopied = 0
-                    let wCopy = Self.copyProgressWeight
+                    // Each folder under the source is ingested as its own timeline (then auto-split within it).
+                    let shootGroups = self.groupFilesBySourceFolder(filesToProcess, sourceRoot: sourceURL)
+                    let orderedGroupKeys = shootGroups.keys.sorted { lhs, rhs in
+                        let lhsDate = shootGroups[lhs]!.map(\.date).min()!
+                        let rhsDate = shootGroups[rhs]!.map(\.date).min()!
+                        if lhsDate != rhsDate { return lhsDate < rhsDate }
+                        return lhs < rhs
+                    }
                     
-                    // Process each sequence
-                    var didProcessFullSequence = false
-                    for i in 0..<sequenceBreaks.count {
+                    for groupKey in orderedGroupKeys {
                         if Task.isCancelled { break }
                         
-                        let startIndex = sequenceBreaks[i]
-                        let endIndex = i < sequenceBreaks.count - 1 ? sequenceBreaks[i + 1] : filesToProcess.count
-                        let sequenceFiles = Array(filesToProcess[startIndex..<endIndex])
+                        var groupFiles = shootGroups[groupKey]!
+                        groupFiles.sort { $0.date < $1.date }
                         
-                        // Sequences smaller than min size go to Extras (see README)
-                        if sequenceFiles.count < self.minSequenceSize {
-                            hasExtras = true
-                            try await self.copySmallSequenceToExtras(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy, verificationMode: verificationMode)
-                            continue
+                        var sequenceBreaks: [Int] = [0]
+                        if self.autoSplit {
+                            if let normalInterval = self.detectNormalInterval(in: groupFiles) {
+                                sequenceBreaks = self.findSequenceBreaks(in: groupFiles, normalInterval: normalInterval)
+                            }
                         }
                         
-                        try await self.processSequence(sequenceFiles, in: outputURL, totalFileCount: totalFileCount, filesCopied: &filesCopied, wMeta: wMeta, wCopy: wCopy, verificationMode: verificationMode)
-                        didProcessFullSequence = true
+                        for i in 0..<sequenceBreaks.count {
+                            if Task.isCancelled { break }
+                            
+                            let startIndex = sequenceBreaks[i]
+                            let endIndex = i < sequenceBreaks.count - 1 ? sequenceBreaks[i + 1] : groupFiles.count
+                            let sequenceFiles = Array(groupFiles[startIndex..<endIndex])
+                            
+                            if sequenceFiles.count < self.minSequenceSize {
+                                hasExtras = true
+                                let extrasFolder = try await self.copySmallSequenceToExtras(
+                                    sequenceFiles,
+                                    in: outputURL,
+                                    totalFileCount: totalFileCount,
+                                    filesCopied: &filesCopied,
+                                    wMeta: wMeta,
+                                    wCopy: wCopy,
+                                    verificationMode: verificationMode
+                                )
+                                updateRevealFolder(extrasFolder)
+                                continue
+                            }
+                            
+                            let sequenceFolder = try await self.processSequence(
+                                sequenceFiles,
+                                in: outputURL,
+                                totalFileCount: totalFileCount,
+                                filesCopied: &filesCopied,
+                                wMeta: wMeta,
+                                wCopy: wCopy,
+                                verificationMode: verificationMode,
+                                assignedSequenceNumbers: &assignedSequenceNumbers
+                            )
+                            updateRevealFolder(sequenceFolder)
+                            didProcessFullSequence = true
+                        }
                     }
                     
                     // Set completion message and folder URL
                     let yearForCompletion = firstYear
                     let hasExtrasSnapshot = hasExtras
                     let didProcessFullSequenceSnapshot = didProcessFullSequence
+                    let revealFolderForCompletion = latestRevealFolder
                     await MainActor.run {
                         guard let year = yearForCompletion else {
                             self.completionMessage = "Ingest finished."
@@ -462,15 +585,17 @@ class RenameViewModel: ObservableObject {
                             self.shouldResetSourceURL = true
                             return
                         }
+                        let yearFolder = outputURL.appendingPathComponent("\(year)", isDirectory: true)
+                        let extrasFolder = yearFolder.appendingPathComponent("Extras", isDirectory: true)
                         if hasExtrasSnapshot && didProcessFullSequenceSnapshot {
                             self.completionMessage = "Ingest finished. Full sequences are in dated folders; sets with fewer than \(self.minSequenceSize) images are in Extras."
-                            self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
+                            self.completionFolderURL = revealFolderForCompletion ?? yearFolder
                         } else if hasExtrasSnapshot {
                             self.completionMessage = "Files were copied to Extras (each sequence had fewer than \(self.minSequenceSize) images)."
-                            self.completionFolderURL = outputURL.appendingPathComponent("\(year)/Extras")
+                            self.completionFolderURL = revealFolderForCompletion ?? extrasFolder
                         } else {
                             self.completionMessage = "Ingest has completed successfully to the \(year) folder"
-                            self.completionFolderURL = outputURL.appendingPathComponent("\(year)")
+                            self.completionFolderURL = revealFolderForCompletion ?? yearFolder
                         }
                         self.showCompletionAlert = true
                         self.shouldResetSourceURL = true
@@ -713,34 +838,39 @@ class RenameViewModel: ObservableObject {
     }
     
     func openCompletionFolder() {
-        guard let folder = completionFolderURL else { return }
-        
-        // Ingest ends with `stopAccessingSecurityScopedResource()` on the output URL. App Sandbox
-        // requires scoped access again before `NSWorkspace` can open paths under a user-selected folder.
-        let accessingOutput = outputURL?.startAccessingSecurityScopedResource() ?? false
-        let accessingFolder = folder.startAccessingSecurityScopedResource()
+        let preferred = completionFolderURL ?? outputURL
+        guard let preferred else { return }
+        let outputRoot = DirectoryBookmark.resolve(stored: outputURL, key: DirectoryBookmarkKey.output) ?? outputURL
+
+        // Ingest releases scoped access when the background task ends; reopen via the output bookmark.
+        let accessingOutput = outputRoot.map { DirectoryBookmark.beginAccess(to: $0) } ?? false
         defer {
-            if accessingFolder {
-                folder.stopAccessingSecurityScopedResource()
-            }
-            if accessingOutput {
-                outputURL?.stopAccessingSecurityScopedResource()
+            if accessingOutput, let outputRoot {
+                outputRoot.stopAccessingSecurityScopedResource()
             }
         }
-        
-        let fm = FileManager.default
-        var urlToOpen = folder
-        if !fm.fileExists(atPath: urlToOpen.path), let output = outputURL, fm.fileExists(atPath: output.path) {
-            urlToOpen = output
-        }
-        
-        if NSWorkspace.shared.open(urlToOpen) {
+
+        guard let urlToReveal = Self.resolvedDirectoryForFinder(preferred: preferred, outputRoot: outputRoot) else {
             return
         }
-        NSWorkspace.shared.activateFileViewerSelecting([urlToOpen])
+        NSWorkspace.shared.activateFileViewerSelecting([urlToReveal])
+    }
+
+    /// Picks the best on-disk folder to reveal in Finder (must be under the user-selected output).
+    private static func resolvedDirectoryForFinder(preferred: URL, outputRoot: URL?) -> URL? {
+        let fm = FileManager.default
+        let candidates = [preferred, outputRoot].compactMap { $0?.standardizedFileURL }
+        for url in candidates {
+            var isDirectory: ObjCBool = false
+            if fm.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                return url
+            }
+        }
+        return preferred.standardizedFileURL
     }
     
     /// Copies files from short sequences into `Output/YYYY/Extras/` using `yyyyMMdd-HHmmss` names (README).
+    @discardableResult
     private func copySmallSequenceToExtras(
         _ sequenceFiles: [(url: URL, date: Date)],
         in outputURL: URL,
@@ -749,16 +879,18 @@ class RenameViewModel: ObservableObject {
         wMeta: Double,
         wCopy: Double,
         verificationMode: CopyVerificationMode
-    ) async throws {
+    ) async throws -> URL? {
         let fileManager = FileManager.default
+        var lastExtrasFolder: URL?
         for fileInfo in sequenceFiles {
             if Task.isCancelled { break }
             let fileDate = fileInfo.date
             let year = Calendar.current.component(.year, from: fileDate)
             let extrasFolder = outputURL
-                .appendingPathComponent("\(year)")
-                .appendingPathComponent("Extras")
-            try fileManager.createDirectory(at: extrasFolder, withIntermediateDirectories: true)
+                .appendingPathComponent("\(year)", isDirectory: true)
+                .appendingPathComponent("Extras", isDirectory: true)
+            try DirectoryBookmark.createDirectory(at: extrasFolder, outputRoot: outputURL, label: "the Extras folder")
+            lastExtrasFolder = extrasFolder
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyyMMdd-HHmmss"
             let baseName = formatter.string(from: fileDate)
@@ -783,9 +915,11 @@ class RenameViewModel: ObservableObject {
                 self.progressDetail = "Copying \(copiedCount) / \(totalFileCount): → \(name)"
             }
         }
+        return lastExtrasFolder
     }
     
     // Handles copying and numbering for a sequence, supporting addToExisting logic
+    @discardableResult
     private func processSequence(
         _ sequenceFiles: [(url: URL, date: Date)],
         in outputURL: URL,
@@ -793,18 +927,18 @@ class RenameViewModel: ObservableObject {
         filesCopied: inout Int,
         wMeta: Double,
         wCopy: Double,
-        verificationMode: CopyVerificationMode
-    ) async throws {
+        verificationMode: CopyVerificationMode,
+        assignedSequenceNumbers: inout [String: Int]
+    ) async throws -> URL? {
         let fileManager = FileManager.default
         var effectiveBasename = basename
         var sequenceNumber = 1
         var effectivePadding = numberPadding
         var currentNumber = startNumber
-        var sequenceFolderURL: URL? = nil
 
         if autoRename {
             let firstFileDate = sequenceFiles[0].date
-            sequenceNumber = getNextSequenceNumber(for: firstFileDate, in: outputURL)
+            sequenceNumber = getNextSequenceNumber(for: firstFileDate, in: outputURL, assignedInRun: &assignedSequenceNumbers)
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyyMMdd"
             // Always add underscore after CO for autoRename
@@ -825,15 +959,17 @@ class RenameViewModel: ObservableObject {
             }
         }
 
-        for (idx, fileInfo) in sequenceFiles.enumerated() {
+        var sequenceFolderURL: URL?
+        for fileInfo in sequenceFiles {
             if Task.isCancelled { break }
             let fileURL = fileInfo.url
             let fileDate = fileInfo.date
             let year = Calendar.current.component(.year, from: fileDate)
             let baseFolder = effectiveBasename.hasSuffix("_") ? String(effectiveBasename.dropLast()) : effectiveBasename
-            let yearFolder = outputURL.appendingPathComponent("\(year)")
-            let baseFolderURL = yearFolder.appendingPathComponent(baseFolder)
-            try fileManager.createDirectory(at: baseFolderURL, withIntermediateDirectories: true)
+            let yearFolder = outputURL.appendingPathComponent("\(year)", isDirectory: true)
+            let baseFolderURL = yearFolder.appendingPathComponent(baseFolder, isDirectory: true)
+            try DirectoryBookmark.createDirectory(at: baseFolderURL, outputRoot: outputURL, label: "the sequence folder")
+            sequenceFolderURL = baseFolderURL
             // Always ensure underscore is present
             let baseNameWithUnderscore = effectiveBasename.hasSuffix("_") ? effectiveBasename : effectiveBasename + "_"
             let paddedNumber = String(format: "%0\(effectivePadding)d", currentNumber)
@@ -847,7 +983,6 @@ class RenameViewModel: ObservableObject {
             }
             try await VerifiedFileCopy.copyWithVerification(from: fileURL, to: destinationURL, mode: verificationMode)
             currentNumber += 1
-            if idx == 0 { sequenceFolderURL = baseFolderURL }
             filesCopied += 1
             let copiedCount = filesCopied
             let p = wMeta + wCopy * Double(copiedCount) / Double(max(totalFileCount, 1))
@@ -856,18 +991,17 @@ class RenameViewModel: ObservableObject {
                 self.progressDetail = "Copying \(copiedCount) / \(totalFileCount): → \(writtenName)"
             }
         }
-        // Set the completion folder to the sequence folder if available
-        if let folder = sequenceFolderURL {
-            await MainActor.run {
-                self.completionFolderURL = folder
-            }
-        }
+        return sequenceFolderURL
     }
     
     init() {
-        // Load last output directory from UserDefaults
-        if let lastOutputPath = UserDefaults.standard.string(forKey: "lastOutputDirectory") {
-            outputURL = URL(fileURLWithPath: lastOutputPath)
+        if let restoredOutput = DirectoryBookmark.restore(key: DirectoryBookmarkKey.output) {
+            outputURL = restoredOutput
+        } else if let legacyPath = UserDefaults.standard.string(forKey: "lastOutputDirectory") {
+            outputURL = URL(fileURLWithPath: legacyPath)
+        }
+        if let restoredSource = DirectoryBookmark.restore(key: DirectoryBookmarkKey.source) {
+            sourceURL = restoredSource
         }
         if let raw = UserDefaults.standard.string(forKey: CopyVerificationMode.userDefaultsKey),
            let mode = CopyVerificationMode(rawValue: raw) {
@@ -891,6 +1025,7 @@ class RenameViewModel: ObservableObject {
     }
     
     /// Copies each file into year/month/day folders with a timestamp-based filename (no sequence grouping).
+    @discardableResult
     private func processPhotoModeFiles(
         _ files: [(url: URL, date: Date)],
         in outputURL: URL,
@@ -899,9 +1034,10 @@ class RenameViewModel: ObservableObject {
         wMeta: Double,
         wCopy: Double,
         verificationMode: CopyVerificationMode
-    ) async throws {
+    ) async throws -> URL? {
         let fileManager = FileManager.default
         let calendar = Calendar.current
+        var lastDayFolder: URL?
         
         for fileInfo in files {
             if Task.isCancelled { break }
@@ -914,10 +1050,11 @@ class RenameViewModel: ObservableObject {
             let dayStr = String(format: "%02d", day)
             
             let dayFolder = outputURL
-                .appendingPathComponent("\(year)")
-                .appendingPathComponent(monthStr)
-                .appendingPathComponent(dayStr)
-            try fileManager.createDirectory(at: dayFolder, withIntermediateDirectories: true)
+                .appendingPathComponent("\(year)", isDirectory: true)
+                .appendingPathComponent(monthStr, isDirectory: true)
+                .appendingPathComponent(dayStr, isDirectory: true)
+            try DirectoryBookmark.createDirectory(at: dayFolder, outputRoot: outputURL, label: "the date folder")
+            lastDayFolder = dayFolder
             
             let baseStamp = photoModeTimestampBase(from: date)
             let ext = fileURL.pathExtension
@@ -941,5 +1078,6 @@ class RenameViewModel: ObservableObject {
                 self.progressDetail = "Copying \(copiedCount) / \(totalFileCount): → \(writtenName)"
             }
         }
+        return lastDayFolder
     }
 } 

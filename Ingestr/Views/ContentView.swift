@@ -151,7 +151,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .help("Defaults to full checks, but select \"Size only\" or no verification for faster copies")
-                    Text("Defaults to Full—streaming copy plus byte-for-byte verification (slower on huge batches). Choose Size only or None for faster copies with lighter or no checks. Your choice is saved.")
+                    Text("Defaults to Full—streaming copy plus byte-for-byte verification (slower on huge batches). Choose Size only or None for faster copies with lighter or no checks. All modes keep EXIF/embedded metadata and restore Finder created and modified dates. Your choice is saved.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

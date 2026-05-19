@@ -43,6 +43,65 @@ final class VerifiedFileCopyTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: src), try Data(contentsOf: dst))
     }
 
+    func testFull_preservesCreationAndModificationDates() async throws {
+        let src = tempDir.appendingPathComponent("dated.bin")
+        let dst = tempDir.appendingPathComponent("dated-out.bin")
+        try Data([0xAB, 0xCD]).write(to: src)
+        let created = Date(timeIntervalSince1970: 1_500_000_000)
+        let modified = Date(timeIntervalSince1970: 1_600_000_000)
+        try FileManager.default.setAttributes(
+            [.creationDate: created, .modificationDate: modified],
+            ofItemAtPath: src.path
+        )
+
+        try await VerifiedFileCopy.copyWithVerification(from: src, to: dst, mode: .full)
+
+        let values = try dst.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
+        XCTAssertEqual(values.creationDate?.timeIntervalSince1970 ?? 0, created.timeIntervalSince1970, accuracy: 1)
+        XCTAssertEqual(values.contentModificationDate?.timeIntervalSince1970 ?? 0, modified.timeIntervalSince1970, accuracy: 1)
+    }
+
+    func testNone_preservesCreationAndModificationDates() async throws {
+        let src = tempDir.appendingPathComponent("dated-none.bin")
+        let dst = tempDir.appendingPathComponent("dated-none-out.bin")
+        try Data([1, 2, 3]).write(to: src)
+        let created = Date(timeIntervalSince1970: 1_700_000_000)
+        let modified = Date(timeIntervalSince1970: 1_800_000_000)
+        try FileManager.default.setAttributes(
+            [.creationDate: created, .modificationDate: modified],
+            ofItemAtPath: src.path
+        )
+
+        try await VerifiedFileCopy.copyWithVerification(from: src, to: dst, mode: .none)
+
+        let values = try dst.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
+        XCTAssertEqual(values.creationDate?.timeIntervalSince1970 ?? 0, created.timeIntervalSince1970, accuracy: 1)
+        XCTAssertEqual(values.contentModificationDate?.timeIntervalSince1970 ?? 0, modified.timeIntervalSince1970, accuracy: 1)
+    }
+
+    func testPreserveFileMetadata_copiesExtendedAttribute() throws {
+        let src = tempDir.appendingPathComponent("xattr-src.bin")
+        let dst = tempDir.appendingPathComponent("xattr-dst.bin")
+        try Data("x".utf8).write(to: src)
+        try Data().write(to: dst)
+        let attrName = "com.ingestr.test"
+        let attrValue: [UInt8] = [9, 8, 7]
+        try attrValue.withUnsafeBytes { raw in
+            guard setxattr(src.path, attrName, raw.baseAddress, attrValue.count, 0, 0) == 0 else {
+                XCTFail("setxattr on source failed")
+                return
+            }
+        }
+
+        try VerifiedFileCopy.preserveFileMetadata(from: src, to: dst)
+
+        var readLength = getxattr(dst.path, attrName, nil, 0, 0, 0)
+        XCTAssertEqual(readLength, attrValue.count)
+        var readValue = [UInt8](repeating: 0, count: readLength)
+        XCTAssertEqual(getxattr(dst.path, attrName, &readValue, readLength, 0, 0), readLength)
+        XCTAssertEqual(readValue, attrValue)
+    }
+
     func testVerifySizeOnlyAfterCopy_removesDestOnMismatch() async throws {
         let src = tempDir.appendingPathComponent("a.bin")
         let dst = tempDir.appendingPathComponent("b.bin")

@@ -2,7 +2,7 @@
 
 A modern macOS application for ingesting and organizing images. Use **sequence mode** for time-lapse and shot groups, or **photo mode** to file every image by capture date into year/month/day folders with a timestamped name.
 
-**Current release:** 1.4 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
+**Current release:** 1.5 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ![Ingestr Application](Ingestr/Resources/app_screenshot.png)
 
@@ -79,15 +79,17 @@ Hover each mode in the app for an example output path in the tooltip.
 
 #### Auto Split Sequences
 - Only available when Auto Rename is enabled
-- Automatically detects time gaps between images
-- Creates new sequences when a significant time gap is detected
-- Helps organize photos from different shooting sessions
+- Each **folder under the source** is processed as its own timeline (e.g. one timelapse per shoot folder on the card)
+- Within that folder, automatically detects shot cadence and starts a new sequence on **session-scale** gaps: **10+ minutes** for fast timelapses (roughly 3–30s between frames), or proportionally shorter pauses for slower sequencers (up to ~2 minutes per frame)
+- Helps organize multiple sessions in the same shoot folder
 - If every gap is filtered out (for example identical capture timestamps), ingest continues as **one** sequence instead of stopping with an error
 
 #### Copy verification
 - **Full** (default): streams each file while hashing, then hashes the destination to confirm a byte-for-byte match (extra disk read of the written file).
 - **None**: copies files with the system copy API only—fastest; same as early releases when verification was not offered.
 - **Size only**: after copy, compares source and destination file sizes (very low overhead; does not detect same-size corruption).
+
+All modes preserve **embedded file metadata** (e.g. EXIF in the image bytes) and restore the source file’s **Finder created/modified dates** and extended attributes on the copy.
 
 Your choice is saved between launches. Existing installs that already saved **None** or **Size only** keep that setting until you change it.
 
@@ -156,7 +158,10 @@ After ingesting completes:
 - Swift 5.5+
 
 ### Testing
-- The project now includes automated unit tests for sequence detection, filename generation, and add-to-existing logic. Run tests with Cmd+U in Xcode to ensure continued reliability after changes.
+- The project includes automated unit tests for sequence detection, filename generation, copy metadata, and add-to-existing logic. Run tests with **⌘U** in Xcode, or `./scripts/prepare-release.sh` from the repository root.
+
+### Releasing
+- See [docs/RELEASE.md](docs/RELEASE.md) for version bumps, archive/notarization, and GitHub release steps.
 
 ## Credits
 
