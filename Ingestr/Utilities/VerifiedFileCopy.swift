@@ -19,6 +19,12 @@ enum VerifiedFileCopyError: LocalizedError {
 enum VerifiedFileCopy {
     private static let chunkSize = 1_048_576 // 1 MiB
 
+    /// macOS metadata that should not block ingest if the destination refuses them.
+    private static let skippedExtendedAttributes: Set<String> = [
+        "com.apple.quarantine",
+        "com.apple.provenance",
+    ]
+
     /// Copies `source` to `destination` according to `mode`. Parent directory of `destination` must exist.
     /// Finder creation/modification dates and extended attributes are copied from the source after the file is written.
     static func copyWithVerification(
@@ -42,7 +48,12 @@ enum VerifiedFileCopy {
     /// Embedded file metadata (e.g. EXIF) is unchanged when the copy is byte-identical.
     static func preserveFileMetadata(from source: URL, to destination: URL) throws {
         try applyFinderDates(from: source, to: destination)
-        try copyExtendedAttributes(from: source, to: destination)
+        copyExtendedAttributesBestEffort(from: source, to: destination)
+    }
+
+    /// Whether an xattr should be copied onto the destination (tests use this).
+    static func shouldCopyExtendedAttribute(named name: String) -> Bool {
+        !skippedExtendedAttributes.contains(name)
     }
 
     private static func applyFinderDates(from source: URL, to destination: URL) throws {
@@ -75,19 +86,17 @@ enum VerifiedFileCopy {
         return names
     }
 
-    private static func copyExtendedAttributes(from source: URL, to destination: URL) throws {
+    /// Copies xattrs when possible; skipped/system attrs and write failures do not fail the ingest.
+    private static func copyExtendedAttributesBestEffort(from source: URL, to destination: URL) {
         let srcPath = source.path
         let dstPath = destination.path
         for name in extendedAttributeNames(atPath: srcPath) {
+            guard shouldCopyExtendedAttribute(named: name) else { continue }
             let valueLength = getxattr(srcPath, name, nil, 0, 0, 0)
             guard valueLength > 0 else { continue }
             var value = [UInt8](repeating: 0, count: valueLength)
             guard getxattr(srcPath, name, &value, valueLength, 0, 0) == valueLength else { continue }
-            guard setxattr(dstPath, name, value, valueLength, 0, 0) == 0 else {
-                throw CocoaError(.fileWriteUnknown, userInfo: [
-                    NSLocalizedDescriptionKey: "Failed to copy extended attribute “\(name)” to \(dstPath)."
-                ])
-            }
+            _ = setxattr(dstPath, name, value, valueLength, 0, 0)
         }
     }
 

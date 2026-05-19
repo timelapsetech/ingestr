@@ -10,8 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.5] - 2026-05-18
 
 ### Added
-- **Metadata on copy:** After each ingest copy, Finder **created** and **modified** dates are restored from the source file, and macOS extended attributes are copied. Byte-identical copies (including **Full** verification) still preserve embedded metadata such as EXIF inside the file.
-- Unit tests for source-folder grouping, auto-split gap logic, sequence folder index parsing, and copy metadata preservation.
+- **Metadata on copy:** After each ingest copy, Finder **created** and **modified** dates are restored from the source file. Other macOS extended attributes are copied when the destination allows it. Byte-identical copies (including **Full** verification) still preserve embedded metadata such as EXIF inside the file.
+- **Source file filter:** Skips Finder-hidden files (existing), plus dot-prefixed path segments, `__MACOSX`, AppleDouble `._*` files, and common junk (`.DS_Store`, `Thumbs.db`, `desktop.ini`).
+- Unit tests for source-folder grouping, auto-split gap logic, sequence folder index parsing, copy metadata preservation, ingest file filtering, and extended-attribute handling.
+- Release checklist and `scripts/prepare-release.sh` ([docs/RELEASE.md](docs/RELEASE.md)).
 
 ### Fixed
 - **Sequence ingest (Auto Rename + Auto Split):** Files under separate source subfolders are grouped and split per shoot instead of one global timeline, so multiple timelapses on a card are less likely to be merged or sent to Extras incorrectly.
@@ -19,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto Rename:** Sequence folder index `N` in `YYYYMMDDNCO` supports multi-digit values (e.g. `…10CO`) and tracks indices assigned during the same ingest run.
 - **Output folder permissions:** Verifies sandbox write access to the **output** directory before copying; captures security-scoped bookmarks when you pick or drop folders; clearer errors label the **destination** path (including when creating `Extras`).
 - **Open Folder:** Reveal in Finder uses the output security-scoped bookmark, `activateFileViewerSelecting`, and the last ingested or year folder (not only Extras when sequences were also written).
-- **Build:** Added missing utility sources to the Xcode target (`DirectoryBookmark`, `IngestFilesystemError`) and resolved Swift 6 concurrency warnings for reveal-folder tracking during ingest.
+- **Copy metadata:** Ingest no longer fails when macOS cannot copy extended attributes such as `com.apple.quarantine` onto the destination (`com.apple.quarantine` and `com.apple.provenance` are skipped; other xattrs are best-effort).
+- **Build:** Added missing utility sources to the Xcode target (`DirectoryBookmark`, `IngestFilesystemError`, `IngestFileFilter`) and resolved Swift 6 concurrency warnings for reveal-folder tracking during ingest.
 
 ## [1.4] - 2026-05-04
 ### Added

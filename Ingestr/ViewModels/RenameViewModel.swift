@@ -430,8 +430,13 @@ class RenameViewModel: ObservableObject {
                 
                 // Pass 1: collect matching file URLs (fast — no EXIF yet) so we know N for accurate progress
                 var candidateURLs: [URL] = []
+                let extensionFilter = await MainActor.run { self.extensionFilter }
                 while let fileURL = enumerator?.nextObject() as? URL {
-                    if self.shouldProcessFile(fileURL) {
+                    if IngestFileFilter.isIngestible(
+                        url: fileURL,
+                        relativeTo: sourceURL,
+                        extensionFilter: extensionFilter
+                    ) {
                         candidateURLs.append(fileURL)
                     }
                 }
@@ -623,27 +628,6 @@ class RenameViewModel: ObservableObject {
         isProcessing = false
         progress = 0
         progressDetail = ""
-    }
-    
-    private func shouldProcessFile(_ url: URL) -> Bool {
-        // Skip directories, only process files
-        do {
-            let resourceValues = try url.resourceValues(forKeys: [.isRegularFileKey])
-            guard let isRegularFile = resourceValues.isRegularFile, isRegularFile else {
-                return false
-            }
-        } catch {
-            return false
-        }
-        
-        // If no extension filter is specified, include all files
-        if extensionFilter.isEmpty {
-            return true
-        }
-        
-        // Otherwise, match the extension
-        let fileExtension = url.pathExtension.lowercased()
-        return fileExtension.lowercased() == extensionFilter.lowercased()
     }
     
     // SEQUENTIAL NAMING LOGIC

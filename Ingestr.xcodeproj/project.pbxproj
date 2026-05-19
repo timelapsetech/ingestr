@@ -18,6 +18,7 @@
 		D001D001D001D001D001D004 /* VerifiedFileCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D001D001D001D001D001D003 /* VerifiedFileCopy.swift */; };
 		D001D001D001D001D001D006 /* DirectoryBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = D001D001D001D001D001D005 /* DirectoryBookmark.swift */; };
 		D001D001D001D001D001D008 /* IngestFilesystemError.swift in Sources */ = {isa = PBXBuildFile; fileRef = D001D001D001D001D001D007 /* IngestFilesystemError.swift */; };
+		D001D001D001D001D001D00A /* IngestFileFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D001D001D001D001D001D009 /* IngestFileFilter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,6 +48,7 @@
 		D001D001D001D001D001D003 /* VerifiedFileCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifiedFileCopy.swift; sourceTree = "<group>"; };
 		D001D001D001D001D001D005 /* DirectoryBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryBookmark.swift; sourceTree = "<group>"; };
 		D001D001D001D001D001D007 /* IngestFilesystemError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestFilesystemError.swift; sourceTree = "<group>"; };
+		D001D001D001D001D001D009 /* IngestFileFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestFileFilter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -128,6 +130,7 @@
 				D001D001D001D001D001D001 /* CopyVerificationMode.swift */,
 				D001D001D001D001D001D005 /* DirectoryBookmark.swift */,
 				D001D001D001D001D001D007 /* IngestFilesystemError.swift */,
+				D001D001D001D001D001D009 /* IngestFileFilter.swift */,
 				D001D001D001D001D001D003 /* VerifiedFileCopy.swift */,
 				1A1A1A1A1A1A1A1A1A1A1A43 /* icon_generator.py */,
 			);
@@ -248,6 +251,7 @@
 				D001D001D001D001D001D004 /* VerifiedFileCopy.swift in Sources */,
 				D001D001D001D001D001D006 /* DirectoryBookmark.swift in Sources */,
 				D001D001D001D001D001D008 /* IngestFilesystemError.swift in Sources */,
+				D001D001D001D001D001D00A /* IngestFileFilter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

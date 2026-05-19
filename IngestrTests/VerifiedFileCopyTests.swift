@@ -79,6 +79,30 @@ final class VerifiedFileCopyTests: XCTestCase {
         XCTAssertEqual(values.contentModificationDate?.timeIntervalSince1970 ?? 0, modified.timeIntervalSince1970, accuracy: 1)
     }
 
+    func testShouldCopyExtendedAttribute_skipsQuarantine() {
+        XCTAssertFalse(VerifiedFileCopy.shouldCopyExtendedAttribute(named: "com.apple.quarantine"))
+        XCTAssertFalse(VerifiedFileCopy.shouldCopyExtendedAttribute(named: "com.apple.provenance"))
+        XCTAssertTrue(VerifiedFileCopy.shouldCopyExtendedAttribute(named: "com.ingestr.test"))
+    }
+
+    func testFull_succeedsWhenSourceHasQuarantineAttribute() async throws {
+        let src = tempDir.appendingPathComponent("quarantine-src.jpg")
+        let dst = tempDir.appendingPathComponent("quarantine-dst.jpg")
+        try Data([0xFF, 0xD8, 0xFF]).write(to: src)
+        let quarantineValue: [UInt8] = [0x00, 0x00, 0x00, 0x02]
+        try quarantineValue.withUnsafeBytes { raw in
+            guard setxattr(src.path, "com.apple.quarantine", raw.baseAddress, quarantineValue.count, 0, 0) == 0 else {
+                XCTFail("setxattr quarantine on source failed")
+                return
+            }
+        }
+
+        try await VerifiedFileCopy.copyWithVerification(from: src, to: dst, mode: .full)
+
+        XCTAssertEqual(try Data(contentsOf: src), try Data(contentsOf: dst))
+        XCTAssertEqual(getxattr(dst.path, "com.apple.quarantine", nil, 0, 0, 0), -1)
+    }
+
     func testPreserveFileMetadata_copiesExtendedAttribute() throws {
         let src = tempDir.appendingPathComponent("xattr-src.bin")
         let dst = tempDir.appendingPathComponent("xattr-dst.bin")

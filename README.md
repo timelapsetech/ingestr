@@ -15,6 +15,7 @@ A modern macOS application for ingesting and organizing images. Use **sequence m
 - **Extras Handling**: Small sequences (< 10 images) are automatically moved to an "Extras" folder
 - **Clean, Modern Interface**: Drag-and-drop UI with native macOS controls
 - **File Extension Filtering**: Filter files by extension (e.g., "jpg", "raw")
+- **Junk file skipping**: Ignores hidden/system files (`.DS_Store`, `__MACOSX`, `._*` sidecars, dotfolders, and similar) automatically
 - **Progress Tracking**: Real-time progress monitoring for large batches; copy phase names the active file before long full-verification runs
 - **Dark/Light Mode Support**: Automatically adapts to your macOS appearance settings
 - **Add to Existing**: When enabled, the app will detect the last number in an existing image sequence in the destination and continue numbering from there, matching the zero-padding of existing files. This is useful for appending new images to an already-ingested sequence without overwriting or duplicating numbers.
