@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>How to use Ingestr — options and output layout</title>
-  <meta name="description" content="How to ingest folders, choose sequence or photo mode, configure rename options, extension filters, Add to Existing, and understand output folder layouts on disk.">
+  <meta name="description" content="How to ingest folders, choose sequence or photo mode, configure rename options (including Auto Split Variation %), extension filters, Add to Existing, and understand output folder layouts on disk.">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -69,8 +69,9 @@
 
           <dt>Auto Split Sequences</dt>
           <dd>
-            Available when <strong>Auto Rename</strong> is on. Detects significant time gaps between shots and starts a new sequence instead of lumping everything into one run.
-            Helpful when one folder contains images from more than one session.
+            Available when <strong>Auto Rename</strong> is on. Detects the typical interval between shots, then starts a new sequence when a gap differs from that cadence by the <strong>Variation %</strong> or more (default 10%)—either shorter or longer.
+            Example: on a 10-second cadence, a gap of 9 seconds or less, or 11 seconds or more, begins a new sequence.
+            The Variation % field appears only when Auto Split is checked.
             If every gap is filtered out (for example identical capture timestamps), ingest continues as a single sequence instead of failing.
           </dd>
 

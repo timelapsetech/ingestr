@@ -39,7 +39,7 @@ enum IngestMode: String, CaseIterable, Identifiable {
     
     /// Tooltip for sequence mode (full ingest behavior).
     static let sequenceHelp =
-        "Example output:\n\(IngestMode.sequenceOutputExample)\n\nEach folder under the source is ingested separately. Auto Split keeps fast timelapses (3–30s cadence) together unless there is a 10+ minute gap; slower sequencers (up to ~2 min per frame) split on shorter session pauses. Sets with fewer than 10 images go to Extras."
+        "Example output:\n\(IngestMode.sequenceOutputExample)\n\nEach folder under the source is ingested separately. Auto Split starts a new sequence when the gap between shots differs from the typical cadence by more than the Variation % (default 10%). Sets with fewer than 10 images go to Extras."
     
     /// Tooltip for photo mode (flat date hierarchy + timestamp filenames).
     static let photoHelp =
@@ -48,6 +48,12 @@ enum IngestMode: String, CaseIterable, Identifiable {
 
 private enum IngestModeUserDefaults {
     static let key = "ingestMode"
+}
+
+private enum AutoSplitVariationUserDefaults {
+    static let key = "autoSplitVariationPercent"
+    static let defaultPercent = 10
+    static let allowedRange = 1...1000
 }
 
 private enum DirectoryBookmarkKey {
@@ -87,6 +93,20 @@ class RenameViewModel: ObservableObject {
     @Published var shouldResetSourceURL: Bool = false
     @Published var autoRename: Bool = false
     @Published var autoSplit: Bool = false
+    /// How far a gap may differ from typical cadence before Auto Split starts a new sequence (default 10%).
+    @Published var autoSplitVariationPercent: Int = AutoSplitVariationUserDefaults.defaultPercent {
+        didSet {
+            let clamped = min(
+                max(autoSplitVariationPercent, AutoSplitVariationUserDefaults.allowedRange.lowerBound),
+                AutoSplitVariationUserDefaults.allowedRange.upperBound
+            )
+            if clamped != autoSplitVariationPercent {
+                autoSplitVariationPercent = clamped
+                return
+            }
+            UserDefaults.standard.set(clamped, forKey: AutoSplitVariationUserDefaults.key)
+        }
+    }
     @Published var addToExisting: Bool = false
     @Published var showCompletionAlert: Bool = false
     @Published var completionMessage: String = ""
@@ -105,13 +125,9 @@ class RenameViewModel: ObservableObject {
         }
     }
     
-    // Constants for auto-split (cadence 3–120s typical; session breaks often 10+ minutes)
+    // Constants for auto-split cadence detection
     /// When estimating shot cadence, ignore gaps longer than this (they are session breaks, not frame spacing).
     private let maxCadenceSample: TimeInterval = 180
-    /// Gaps at or above this always start a new sequence (between shooting sessions).
-    private let minimumSessionGap: TimeInterval = 600 // 10 minutes
-    /// For medium cadence (tens of seconds between frames), split when a pause exceeds this and 5× median.
-    private let minimumAdaptiveGap: TimeInterval = 180 // 3 minutes
     private let minImagesForGapDetection: Int = 3 // Minimum images needed to detect normal interval
     private let minSequenceSize: Int = 10 // Minimum number of images to consider a sequence
     /// Share of the bar used while reading EXIF/metadata (rest is copy).
@@ -342,31 +358,32 @@ class RenameViewModel: ObservableObject {
         return sortedIntervals[medianIndex]
     }
     
-    /// Split threshold from typical shot cadence: fast timelapses tolerate pauses up to ~10 minutes;
-    /// slower sequencers (tens of seconds per frame) split on shorter between-session gaps.
-    func sequenceSplitThreshold(for normalInterval: TimeInterval) -> TimeInterval {
-        if normalInterval <= 30 {
-            // ~3–30s between frames: require a session-length pause (≥10 min) before splitting.
-            return max(normalInterval * 5, minimumSessionGap)
-        }
-        if normalInterval <= 120 {
-            // ~30s–2 min between frames: split when pause is well above cadence (≥3 min floor).
-            return max(normalInterval * 5, minimumAdaptiveGap)
-        }
-        if normalInterval <= maxCadenceSample {
-            // Sparse but still sampled as in-shoot cadence.
-            return max(normalInterval * 3, minimumAdaptiveGap)
-        }
-        return max(normalInterval * 3, minimumSessionGap)
+    /// Absolute seconds a gap may differ from `normalInterval` before a split (Variation %).
+    func sequenceSplitAllowedDeviation(for normalInterval: TimeInterval, variationPercent: Int) -> TimeInterval {
+        let percent = Double(
+            min(
+                max(variationPercent, AutoSplitVariationUserDefaults.allowedRange.lowerBound),
+                AutoSplitVariationUserDefaults.allowedRange.upperBound
+            )
+        )
+        return normalInterval * (percent / 100.0)
     }
     
-    func findSequenceBreaks(in files: [(url: URL, date: Date)], normalInterval: TimeInterval) -> [Int] {
+    /// Starts a new sequence when a gap differs from typical cadence by ≥ Variation % (faster or slower).
+    func findSequenceBreaks(
+        in files: [(url: URL, date: Date)],
+        normalInterval: TimeInterval,
+        variationPercent: Int = AutoSplitVariationUserDefaults.defaultPercent
+    ) -> [Int] {
         var breaks: [Int] = [0]
-        let gapThreshold = sequenceSplitThreshold(for: normalInterval)
+        let allowedDeviation = sequenceSplitAllowedDeviation(
+            for: normalInterval,
+            variationPercent: variationPercent
+        )
         
         for i in 1..<files.count {
             let interval = files[i].date.timeIntervalSince(files[i-1].date)
-            if interval >= minimumSessionGap || interval >= gapThreshold {
+            if abs(interval - normalInterval) >= allowedDeviation {
                 breaks.append(i)
             }
         }
@@ -536,7 +553,11 @@ class RenameViewModel: ObservableObject {
                         var sequenceBreaks: [Int] = [0]
                         if self.autoSplit {
                             if let normalInterval = self.detectNormalInterval(in: groupFiles) {
-                                sequenceBreaks = self.findSequenceBreaks(in: groupFiles, normalInterval: normalInterval)
+                                sequenceBreaks = self.findSequenceBreaks(
+                                    in: groupFiles,
+                                    normalInterval: normalInterval,
+                                    variationPercent: self.autoSplitVariationPercent
+                                )
                             }
                         }
                         
@@ -995,6 +1016,12 @@ class RenameViewModel: ObservableObject {
            let mode = IngestMode(rawValue: raw) {
             ingestMode = mode
         }
+        let storedVariation = UserDefaults.standard.object(forKey: AutoSplitVariationUserDefaults.key) as? Int
+            ?? AutoSplitVariationUserDefaults.defaultPercent
+        autoSplitVariationPercent = min(
+            max(storedVariation, AutoSplitVariationUserDefaults.allowedRange.lowerBound),
+            AutoSplitVariationUserDefaults.allowedRange.upperBound
+        )
     }
     
     /// Photo mode: `Output/YYYY/MM/DD/yyyy-MM-dd-HHmmss-SSS.ext` (adds `_2`, `_3`, … if the name still collides).

@@ -8,7 +8,7 @@ Update these together for every release:
 
 | Location | Keys |
 |----------|------|
-| `Ingestr.xcodeproj` → Ingestr target | `MARKETING_VERSION` (user-facing, e.g. `1.5`), `CURRENT_PROJECT_VERSION` (build number, e.g. `7`) |
+| `Ingestr.xcodeproj` → Ingestr target | `MARKETING_VERSION` (user-facing, e.g. `1.6`), `CURRENT_PROJECT_VERSION` (build number, e.g. `8`) |
 | `Ingestr/Info.plist` | Uses `$(MARKETING_VERSION)` and `$(CURRENT_PROJECT_VERSION)` — no manual edit needed |
 | `CHANGELOG.md` | Move `[Unreleased]` into a dated section |
 | `README.md` | **Current release** line |
@@ -45,7 +45,7 @@ cd /path/to/exported
 ditto -c -k --sequesterRsrc --keepParent Ingestr.app Ingestr.zip
 ```
 
-Upload `Ingestr.zip` to a [GitHub Release](https://github.com/timelapsetech/ingestr/releases) tagged `v1.5` (match `MARKETING_VERSION`). The site and README link to:
+Upload `Ingestr.zip` to a [GitHub Release](https://github.com/timelapsetech/ingestr/releases) tagged `v1.6` (match `MARKETING_VERSION`). The site and README link to:
 
 `https://github.com/timelapsetech/ingestr/releases/latest/download/Ingestr.zip`
 
@@ -54,12 +54,12 @@ Optional: copy the zip to `Release/Ingestr.zip` in the repo only if you intentio
 ## 5. Git tag
 
 ```bash
-git tag -a v1.5 -m "Ingestr 1.5"
-git push origin v1.5
+git tag -a v1.6 -m "Ingestr 1.6"
+git push origin v1.6
 ```
 
 ## 6. After release
 
-- Confirm **Open Folder**, **Auto Rename + Auto Split**, and output-folder permissions on a real card dump.
+- Confirm **Open Folder**, **Auto Rename + Auto Split** (including **Variation %**), and output-folder permissions on a real card dump.
 - Update App Store Connect version/build if you ship the Mac App Store listing.
 - Deploy docs if you host `docs/` on GitHub Pages (`docs/index.html`, `docs/guide.html`).

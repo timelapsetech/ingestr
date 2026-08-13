@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6] - 2026-08-13
+
+### Added
+- **Auto Split Variation %:** When Auto Split is checked, set how far a gap may differ from typical cadence before a new sequence starts (default **10%**—e.g. ±1s on a 10s cadence; range **1–1000%**). The control is hidden unless Auto Split is on; the value is saved between launches.
+
+### Changed
+- **Auto Split:** Splits on cadence **variation** (shorter or longer than typical spacing by the Variation %), instead of session-length gap floors (10+ minutes / adaptive minutes).
+
 ## [1.5] - 2026-05-18
 
 ### Added

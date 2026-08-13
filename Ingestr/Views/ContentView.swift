@@ -9,7 +9,9 @@ struct ContentView: View {
         static let autoRename =
             "Uses image metadata (such as EXIF capture date) from the first image in each sequence to determine that sequence's date, then builds folder and file names from it—for example the dated sequence folder pattern."
         static let autoSplit =
-            "When Auto Rename is on: detects breaks in image sequence cadence—intervals between shots much larger than the usual spacing—and starts a new sequence automatically."
+            "When Auto Rename is on: detects the typical interval between shots, then starts a new sequence when a gap differs from that cadence by the Variation % or more—either shorter or longer."
+        static let variationPercent =
+            "How much the gap between shots may differ from the typical cadence before Auto Split starts a new sequence. Default is 10%: on a 10-second cadence, a gap of 9 seconds or less, or 11 seconds or more, begins a new sequence."
     }
     
     var body: some View {
@@ -86,7 +88,7 @@ struct ContentView: View {
 
                     // Native `.help` on `Toggle` often never appears on macOS. Show the same text via `Image`+`.help`
                     // (reliable) and mirror it with `accessibilityHint` on the toggle for VoiceOver.
-                    HStack(alignment: .center, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
                         HStack(spacing: 6) {
                             Toggle("Auto Rename", isOn: $viewModel.autoRename)
                                 .disabled(viewModel.ingestMode == .photo)
@@ -95,11 +97,39 @@ struct ContentView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        HStack(spacing: 6) {
-                            Toggle("Auto Split", isOn: $viewModel.autoSplit)
-                                .disabled(!viewModel.autoRename || viewModel.ingestMode == .photo)
-                                .accessibilityHint(RenameTooltip.autoSplit)
-                            RenameHelpTipIcon(tooltip: RenameTooltip.autoSplit)
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Toggle("Auto Split", isOn: $viewModel.autoSplit)
+                                    .disabled(!viewModel.autoRename || viewModel.ingestMode == .photo)
+                                    .accessibilityHint(RenameTooltip.autoSplit)
+                                RenameHelpTipIcon(tooltip: RenameTooltip.autoSplit)
+                            }
+
+                            if viewModel.autoSplit {
+                                HStack(spacing: 6) {
+                                    Text("Variation %")
+                                        .font(.subheadline)
+                                    TextField(
+                                        "",
+                                        value: $viewModel.autoSplitVariationPercent,
+                                        formatter: Self.variationPercentFormatter
+                                    )
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 56)
+                                    .disabled(!viewModel.autoRename || viewModel.ingestMode == .photo)
+                                    .accessibilityLabel("Variation percent")
+                                    .accessibilityHint(RenameTooltip.variationPercent)
+                                    Stepper(
+                                        "",
+                                        value: $viewModel.autoSplitVariationPercent,
+                                        in: 1...1000
+                                    )
+                                    .labelsHidden()
+                                    .disabled(!viewModel.autoRename || viewModel.ingestMode == .photo)
+                                    RenameHelpTipIcon(tooltip: RenameTooltip.variationPercent)
+                                }
+                                .padding(.leading, 2)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -228,7 +258,7 @@ struct ContentView: View {
             }
             .padding(.horizontal)
         }
-        .frame(minWidth: 400, maxWidth: 450, minHeight: 760)
+        .frame(minWidth: 400, maxWidth: 450, minHeight: 800)
         .background(colorScheme == .dark ? Color.black : Color.white)
         .onAppear {
             // Reset URL on app launch
@@ -247,6 +277,15 @@ struct ContentView: View {
             Text(viewModel.completionMessage)
         }
     }
+
+    private static let variationPercentFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimum = 1
+        formatter.maximum = 1000
+        formatter.maximumFractionDigits = 0
+        return formatter
+    }()
 }
 
 /// SF Symbol + `.help` shows native macOS tooltips reliably (unlike `Toggle` + `.help`).

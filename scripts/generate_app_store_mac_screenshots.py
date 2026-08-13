@@ -357,7 +357,7 @@ def draw_slide_1(canvas: Image.Image, main: Image.Image) -> None:
     y += int(12 * s)
 
     cards = [
-        ("Smart sequence detection", "Groups shots by capture time so mixed folders split sensibly."),
+        ("Auto split with Variation %", "Starts a new sequence when gaps differ from typical cadence by your Variation % (default 10%)."),
         ("Auto rename from EXIF", "Dated folders and consistent names from your camera metadata."),
         ("Extension filter & Add to existing", "Process only JPG or RAW, or append to a sequence already on disk."),
         ("Copy verification", "Optional size check or full byte-for-byte confirmation after copy."),

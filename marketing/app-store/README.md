@@ -19,7 +19,7 @@ Additional guidance:
 - [Upload app previews and screenshots](https://developer.apple.com/help/app-store-connect/manage-app-information/upload-app-previews-and-screenshots) — how to add assets in App Store Connect
 - [Screenshot design best practices](https://developer.apple.com/app-store/product-page/) (Product page overview; follow honest representation of the app)
 
-Screenshots should show **real app UI** and not mislead users about functionality. The generator composites your existing UI captures into a **marketing-page-style** layout: soft gradient and accent blobs (matching the site palette), **feature cards** with copy aligned to `docs/index.html`, and a **large rounded window** with drop shadow on the right. Regenerate after updating `docs/images/` sources or editing `scripts/generate_app_store_mac_screenshots.py`.
+Screenshots should show **real app UI** and not mislead users about functionality. The generator composites your existing UI captures into a **marketing-page-style** layout: soft gradient and accent blobs (matching the site palette), **feature cards** with copy aligned to `docs/index.html` (including Auto Split Variation %), and a **large rounded window** with drop shadow on the right. Regenerate after updating `docs/images/` sources or editing `scripts/generate_app_store_mac_screenshots.py`.
 
 ## What’s included
 

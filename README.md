@@ -2,7 +2,7 @@
 
 A modern macOS application for ingesting and organizing images. Use **sequence mode** for time-lapse and shot groups, or **photo mode** to file every image by capture date into year/month/day folders with a timestamped name.
 
-**Current release:** 1.5 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
+**Current release:** 1.6 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ![Ingestr Application](Ingestr/Resources/app_screenshot.png)
 
@@ -11,7 +11,7 @@ A modern macOS application for ingesting and organizing images. Use **sequence m
 - **Sequence mode or Photo mode**: **Sequence mode** (default) detects sequences, supports auto rename, split, and Extras. **Photo mode** skips sequence logic and writes each file to `Year/Month/Day` with a `yyyy-MM-dd-HHmmss-SSS` filename from capture time.
 - **Smart Sequence Detection**: Automatically detects and organizes image sequences based on capture time
 - **Auto Rename**: Uses EXIF date from images to create organized folder structures
-- **Auto Split**: Automatically splits sequences when significant time gaps are detected
+- **Auto Split**: Automatically splits sequences when gaps differ from typical cadence by a Variation % (default 10%)
 - **Extras Handling**: Small sequences (< 10 images) are automatically moved to an "Extras" folder
 - **Clean, Modern Interface**: Drag-and-drop UI with native macOS controls
 - **File Extension Filtering**: Filter files by extension (e.g., "jpg", "raw")
@@ -81,8 +81,9 @@ Hover each mode in the app for an example output path in the tooltip.
 #### Auto Split Sequences
 - Only available when Auto Rename is enabled
 - Each **folder under the source** is processed as its own timeline (e.g. one timelapse per shoot folder on the card)
-- Within that folder, automatically detects shot cadence and starts a new sequence on **session-scale** gaps: **10+ minutes** for fast timelapses (roughly 3–30s between frames), or proportionally shorter pauses for slower sequencers (up to ~2 minutes per frame)
-- Helps organize multiple sessions in the same shoot folder
+- Within that folder, detects typical shot cadence and starts a new sequence when a gap differs from that cadence by the **Variation %** or more (default **10%**)—either shorter or longer. Example: on a 10-second cadence, a gap of 9s or less, or 11s or more, begins a new sequence
+- The Variation % control appears only when Auto Split is checked (range **1–1000%**, default 10%); the value is remembered between launches
+- Helps organize multiple sessions or cadence changes in the same shoot folder
 - If every gap is filtered out (for example identical capture timestamps), ingest continues as **one** sequence instead of stopping with an error
 
 #### Copy verification

@@ -51,81 +51,70 @@ final class SequenceDetectionTests: XCTestCase {
         XCTAssertEqual(groups["B"]?.count, 1)
     }
 
-    // MARK: - Split threshold tiers
+    // MARK: - Variation % deviation
 
-    func testSequenceSplitThreshold_fastTimelapseRequiresTenMinuteGap() {
-        XCTAssertEqual(viewModel.sequenceSplitThreshold(for: 5), 600)
-        XCTAssertEqual(viewModel.sequenceSplitThreshold(for: 30), 600)
+    func testSequenceSplitAllowedDeviation_tenPercentOfTenSeconds() {
+        XCTAssertEqual(viewModel.sequenceSplitAllowedDeviation(for: 10, variationPercent: 10), 1)
     }
 
-    func testSequenceSplitThreshold_mediumCadenceUsesAdaptiveFloor() {
-        XCTAssertEqual(viewModel.sequenceSplitThreshold(for: 60), 300)
-        XCTAssertEqual(viewModel.sequenceSplitThreshold(for: 120), 600)
+    func testSequenceSplitAllowedDeviation_clampsPercentRange() {
+        XCTAssertEqual(viewModel.sequenceSplitAllowedDeviation(for: 10, variationPercent: 0), 0.1)
+        XCTAssertEqual(viewModel.sequenceSplitAllowedDeviation(for: 10, variationPercent: 200), 20)
+        XCTAssertEqual(viewModel.sequenceSplitAllowedDeviation(for: 10, variationPercent: 2000), 100)
     }
 
-    // MARK: - Fast timelapse (3–30s cadence)
+    // MARK: - Variation-based breaks (default 10%)
 
-    func testFindSequenceBreaks_fastTimelapse_toleratesTwoMinutePause() {
+    func testFindSequenceBreaks_tenSecondCadence_splitsOnOneSecondLonger() {
         let base = Date(timeIntervalSince1970: 0)
-        let files: [(url: URL, date: Date)] = (0..<5).map { i in
-            (url: URL(fileURLWithPath: "/tmp/\(i).jpg"), date: base.addingTimeInterval(Double(i) * 5))
+        var files: [(url: URL, date: Date)] = (0..<4).map { i in
+            (url: URL(fileURLWithPath: "/tmp/a\(i).jpg"), date: base.addingTimeInterval(Double(i) * 10))
         }
-        var withPause = files
-        withPause.append((url: URL(fileURLWithPath: "/tmp/5.jpg"), date: base.addingTimeInterval(120)))
-        withPause.append((url: URL(fileURLWithPath: "/tmp/6.jpg"), date: base.addingTimeInterval(125)))
+        // Gap of 11s (≥ 10% longer than 10s) starts a new sequence
+        files.append((url: URL(fileURLWithPath: "/tmp/b0.jpg"), date: base.addingTimeInterval(30 + 11)))
+        files.append((url: URL(fileURLWithPath: "/tmp/b1.jpg"), date: base.addingTimeInterval(30 + 21)))
 
-        let breaks = viewModel.findSequenceBreaks(in: withPause, normalInterval: 5)
-        XCTAssertEqual(breaks, [0], "A 2-minute pause on a 5s timelapse should stay one sequence")
+        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 10, variationPercent: 10)
+        XCTAssertEqual(breaks, [0, 4], "An 11s gap on a 10s cadence should start a new sequence at 10%")
     }
 
-    func testFindSequenceBreaks_fastTimelapse_splitsAfterTenMinutes() {
+    func testFindSequenceBreaks_tenSecondCadence_splitsOnOneSecondShorter() {
         let base = Date(timeIntervalSince1970: 0)
-        var files: [(url: URL, date: Date)] = (0..<5).map { i in
-            (url: URL(fileURLWithPath: "/tmp/a\(i).jpg"), date: base.addingTimeInterval(Double(i) * 5))
+        var files: [(url: URL, date: Date)] = (0..<4).map { i in
+            (url: URL(fileURLWithPath: "/tmp/a\(i).jpg"), date: base.addingTimeInterval(Double(i) * 10))
         }
-        files.append((url: URL(fileURLWithPath: "/tmp/b0.jpg"), date: base.addingTimeInterval(660)))
-        files.append((url: URL(fileURLWithPath: "/tmp/b1.jpg"), date: base.addingTimeInterval(665)))
+        // Gap of 9s (≥ 10% shorter than 10s) starts a new sequence
+        files.append((url: URL(fileURLWithPath: "/tmp/b0.jpg"), date: base.addingTimeInterval(30 + 9)))
+        files.append((url: URL(fileURLWithPath: "/tmp/b1.jpg"), date: base.addingTimeInterval(30 + 19)))
 
-        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 5)
-        XCTAssertEqual(breaks, [0, 5], "An 11-minute gap should start a new sequence")
+        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 10, variationPercent: 10)
+        XCTAssertEqual(breaks, [0, 4], "A 9s gap on a 10s cadence should start a new sequence at 10%")
     }
 
-    func testFindSequenceBreaks_fastTimelapse_splitsExactlyAtTenMinutes() {
+    func testFindSequenceBreaks_tenSecondCadence_toleratesSubThresholdJitter() {
         let base = Date(timeIntervalSince1970: 0)
         var files: [(url: URL, date: Date)] = (0..<3).map { i in
-            (url: URL(fileURLWithPath: "/tmp/a\(i).jpg"), date: base.addingTimeInterval(Double(i) * 3))
+            (url: URL(fileURLWithPath: "/tmp/\(i).jpg"), date: base.addingTimeInterval(Double(i) * 10))
         }
-        files.append((url: URL(fileURLWithPath: "/tmp/b0.jpg"), date: base.addingTimeInterval(9 + 600)))
-        files.append((url: URL(fileURLWithPath: "/tmp/b1.jpg"), date: base.addingTimeInterval(9 + 603)))
+        // 10.5s is only 5% off a 10s cadence — under the 10% threshold
+        files.append((url: URL(fileURLWithPath: "/tmp/3.jpg"), date: base.addingTimeInterval(20 + 10.5)))
+        files.append((url: URL(fileURLWithPath: "/tmp/4.jpg"), date: base.addingTimeInterval(20 + 20.5)))
 
-        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 3)
-        XCTAssertEqual(breaks, [0, 3], "A 10-minute gap should start a new sequence")
+        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 10, variationPercent: 10)
+        XCTAssertEqual(breaks, [0], "Sub-threshold jitter should stay one sequence")
     }
 
-    // MARK: - Medium cadence (~30–120s between frames)
-
-    func testFindSequenceBreaks_sixtySecondCadence_toleratesTwoMinutePause() {
+    func testFindSequenceBreaks_higherVariationPercent_toleratesLargerSwing() {
         let base = Date(timeIntervalSince1970: 0)
-        var files: [(url: URL, date: Date)] = (0..<4).map { i in
-            (url: URL(fileURLWithPath: "/tmp/\(i).jpg"), date: base.addingTimeInterval(Double(i) * 60))
+        var files: [(url: URL, date: Date)] = (0..<3).map { i in
+            (url: URL(fileURLWithPath: "/tmp/\(i).jpg"), date: base.addingTimeInterval(Double(i) * 10))
         }
-        files.append((url: URL(fileURLWithPath: "/tmp/4.jpg"), date: base.addingTimeInterval(240 + 120)))
-        files.append((url: URL(fileURLWithPath: "/tmp/5.jpg"), date: base.addingTimeInterval(240 + 180)))
+        // 12s is 20% off; at 25% variation it should stay together
+        files.append((url: URL(fileURLWithPath: "/tmp/3.jpg"), date: base.addingTimeInterval(20 + 12)))
+        files.append((url: URL(fileURLWithPath: "/tmp/4.jpg"), date: base.addingTimeInterval(20 + 22)))
 
-        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 60)
-        XCTAssertEqual(breaks, [0], "A 2-minute extra pause on 60s cadence should stay one sequence")
-    }
-
-    func testFindSequenceBreaks_sixtySecondCadence_splitsOnFiveMinuteSessionGap() {
-        let base = Date(timeIntervalSince1970: 0)
-        var files: [(url: URL, date: Date)] = (0..<4).map { i in
-            (url: URL(fileURLWithPath: "/tmp/a\(i).jpg"), date: base.addingTimeInterval(Double(i) * 60))
-        }
-        files.append((url: URL(fileURLWithPath: "/tmp/b0.jpg"), date: base.addingTimeInterval(240 + 300)))
-        files.append((url: URL(fileURLWithPath: "/tmp/b1.jpg"), date: base.addingTimeInterval(240 + 360)))
-
-        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 60)
-        XCTAssertEqual(breaks, [0, 4], "A 5-minute gap on 60s cadence should start a new sequence")
+        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 10, variationPercent: 25)
+        XCTAssertEqual(breaks, [0], "A 20% swing should be allowed when Variation % is 25")
     }
 
     // MARK: - Cadence detection
