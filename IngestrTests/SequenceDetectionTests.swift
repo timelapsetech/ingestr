@@ -74,7 +74,7 @@ final class SequenceDetectionTests: XCTestCase {
         files.append((url: URL(fileURLWithPath: "/tmp/b0.jpg"), date: base.addingTimeInterval(30 + 11)))
         files.append((url: URL(fileURLWithPath: "/tmp/b1.jpg"), date: base.addingTimeInterval(30 + 21)))
 
-        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 10, variationPercent: 10)
+        let breaks = viewModel.findSequenceBreaks(in: files, variationPercent: 10)
         XCTAssertEqual(breaks, [0, 4], "An 11s gap on a 10s cadence should start a new sequence at 10%")
     }
 
@@ -87,7 +87,7 @@ final class SequenceDetectionTests: XCTestCase {
         files.append((url: URL(fileURLWithPath: "/tmp/b0.jpg"), date: base.addingTimeInterval(30 + 9)))
         files.append((url: URL(fileURLWithPath: "/tmp/b1.jpg"), date: base.addingTimeInterval(30 + 19)))
 
-        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 10, variationPercent: 10)
+        let breaks = viewModel.findSequenceBreaks(in: files, variationPercent: 10)
         XCTAssertEqual(breaks, [0, 4], "A 9s gap on a 10s cadence should start a new sequence at 10%")
     }
 
@@ -100,7 +100,7 @@ final class SequenceDetectionTests: XCTestCase {
         files.append((url: URL(fileURLWithPath: "/tmp/3.jpg"), date: base.addingTimeInterval(20 + 10.5)))
         files.append((url: URL(fileURLWithPath: "/tmp/4.jpg"), date: base.addingTimeInterval(20 + 20.5)))
 
-        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 10, variationPercent: 10)
+        let breaks = viewModel.findSequenceBreaks(in: files, variationPercent: 10)
         XCTAssertEqual(breaks, [0], "Sub-threshold jitter should stay one sequence")
     }
 
@@ -113,8 +113,27 @@ final class SequenceDetectionTests: XCTestCase {
         files.append((url: URL(fileURLWithPath: "/tmp/3.jpg"), date: base.addingTimeInterval(20 + 12)))
         files.append((url: URL(fileURLWithPath: "/tmp/4.jpg"), date: base.addingTimeInterval(20 + 22)))
 
-        let breaks = viewModel.findSequenceBreaks(in: files, normalInterval: 10, variationPercent: 25)
+        let breaks = viewModel.findSequenceBreaks(in: files, variationPercent: 25)
         XCTAssertEqual(breaks, [0], "A 20% swing should be allowed when Variation % is 25")
+    }
+
+    func testFindSequenceBreaks_newSequenceRecalculatesCadence() {
+        let base = Date(timeIntervalSince1970: 0)
+        // Eight frames at 10s, then eight at 30s. A global 10s cadence would treat every 30s
+        // gap as a split and send those frames to Extras; the second shoot must get its own cadence.
+        var files: [(url: URL, date: Date)] = (0..<8).map { i in
+            (url: URL(fileURLWithPath: "/tmp/a\(i).jpg"), date: base.addingTimeInterval(Double(i) * 10))
+        }
+        let secondStart = 70.0 + 30.0
+        for i in 0..<8 {
+            files.append((
+                url: URL(fileURLWithPath: "/tmp/b\(i).jpg"),
+                date: base.addingTimeInterval(secondStart + Double(i) * 30)
+            ))
+        }
+
+        let breaks = viewModel.findSequenceBreaks(in: files, variationPercent: 10)
+        XCTAssertEqual(breaks, [0, 8], "A later 30s cadence should stay one sequence after splitting off 10s")
     }
 
     // MARK: - Cadence detection

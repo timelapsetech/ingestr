@@ -2,7 +2,7 @@
 
 A modern macOS application for ingesting and organizing images. Use **sequence mode** for time-lapse and shot groups, or **photo mode** to file every image by capture date into year/month/day folders with a timestamped name.
 
-**Current release:** 1.6 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
+**Current release:** 1.6.1 — see [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ![Ingestr Application](Ingestr/Resources/app_screenshot.png)
 
@@ -81,7 +81,7 @@ Hover each mode in the app for an example output path in the tooltip.
 #### Auto Split Sequences
 - Only available when Auto Rename is enabled
 - Each **folder under the source** is processed as its own timeline (e.g. one timelapse per shoot folder on the card)
-- Within that folder, detects typical shot cadence and starts a new sequence when a gap differs from that cadence by the **Variation %** or more (default **10%**)—either shorter or longer. Example: on a 10-second cadence, a gap of 9s or less, or 11s or more, begins a new sequence
+- Within that folder, detects typical shot cadence and starts a new sequence when a gap differs from that cadence by the **Variation %** or more (default **10%**)—either shorter or longer. Example: on a 10-second cadence, a gap of 9s or less, or 11s or more, begins a new sequence. After a split, cadence is measured again from the new sequence so a later shoot at a different interval stays together.
 - The Variation % control appears only when Auto Split is checked (range **1–1000%**, default 10%); the value is remembered between launches
 - Helps organize multiple sessions or cadence changes in the same shoot folder
 - If every gap is filtered out (for example identical capture timestamps), ingest continues as **one** sequence instead of stopping with an error

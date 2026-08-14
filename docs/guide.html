@@ -71,6 +71,7 @@
           <dd>
             Available when <strong>Auto Rename</strong> is on. Detects the typical interval between shots, then starts a new sequence when a gap differs from that cadence by the <strong>Variation %</strong> or more (default 10%)—either shorter or longer.
             Example: on a 10-second cadence, a gap of 9 seconds or less, or 11 seconds or more, begins a new sequence.
+            After a split, cadence is measured again from the new sequence so a later shoot at a different interval stays together instead of being broken into Extras.
             The Variation % field appears only when Auto Split is checked.
             If every gap is filtered out (for example identical capture timestamps), ingest continues as a single sequence instead of failing.
           </dd>

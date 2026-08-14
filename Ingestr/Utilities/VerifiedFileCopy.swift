@@ -47,8 +47,9 @@ enum VerifiedFileCopy {
     /// Restores Finder-visible dates and extended attributes from `source` onto `destination`.
     /// Embedded file metadata (e.g. EXIF) is unchanged when the copy is byte-identical.
     static func preserveFileMetadata(from source: URL, to destination: URL) throws {
-        try applyFinderDates(from: source, to: destination)
+        // xattr writes update mtime; restore Finder dates after attributes so modified time sticks.
         copyExtendedAttributesBestEffort(from: source, to: destination)
+        try applyFinderDates(from: source, to: destination)
     }
 
     /// Whether an xattr should be copied onto the destination (tests use this).
@@ -59,15 +60,14 @@ enum VerifiedFileCopy {
     private static func applyFinderDates(from source: URL, to destination: URL) throws {
         let keys: Set<URLResourceKey> = [.creationDateKey, .contentModificationDateKey]
         let values = try source.resourceValues(forKeys: keys)
-        var attributes: [FileAttributeKey: Any] = [:]
+        // Creation last in a combined setAttributes call can clobber mtime on APFS.
+        // Set birthtime first, then modification so Finder Date Modified matches the source.
         if let created = values.creationDate {
-            attributes[.creationDate] = created
+            try FileManager.default.setAttributes([.creationDate: created], ofItemAtPath: destination.path)
         }
         if let modified = values.contentModificationDate {
-            attributes[.modificationDate] = modified
+            try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: destination.path)
         }
-        guard !attributes.isEmpty else { return }
-        try FileManager.default.setAttributes(attributes, ofItemAtPath: destination.path)
     }
 
     private static func extendedAttributeNames(atPath path: String) -> [String] {

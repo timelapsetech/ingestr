@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-08-14
+
+### Fixed
+- **Auto Split:** Cadence is recalculated for each new sequence. Previously a single folder-wide interval was reused, so a later shoot with different timing was split on every frame and mostly sent to Extras.
+- **Copy metadata:** Finder **modified** date is restored after extended attributes are copied. xattr writes were bumping Date Modified to copy time, so Get Info often showed the original created date but a new modified date.
+
 ## [1.6] - 2026-08-13
 
 ### Added

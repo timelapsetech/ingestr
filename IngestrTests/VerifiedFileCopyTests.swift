@@ -126,6 +126,32 @@ final class VerifiedFileCopyTests: XCTestCase {
         XCTAssertEqual(readValue, attrValue)
     }
 
+    func testPreserveFileMetadata_keepsModificationDateAfterCopyingXattrs() throws {
+        let src = tempDir.appendingPathComponent("dated-xattr-src.bin")
+        let dst = tempDir.appendingPathComponent("dated-xattr-dst.bin")
+        try Data("payload".utf8).write(to: src)
+        try Data().write(to: dst)
+        let attrValue: [UInt8] = [1, 2, 3, 4]
+        try attrValue.withUnsafeBytes { raw in
+            guard setxattr(src.path, "com.ingestr.test", raw.baseAddress, attrValue.count, 0, 0) == 0 else {
+                XCTFail("setxattr on source failed")
+                return
+            }
+        }
+        let created = Date(timeIntervalSince1970: 1_400_000_000)
+        let modified = Date(timeIntervalSince1970: 1_450_000_000)
+        try FileManager.default.setAttributes(
+            [.creationDate: created, .modificationDate: modified],
+            ofItemAtPath: src.path
+        )
+
+        try VerifiedFileCopy.preserveFileMetadata(from: src, to: dst)
+
+        let values = try dst.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
+        XCTAssertEqual(values.creationDate?.timeIntervalSince1970 ?? 0, created.timeIntervalSince1970, accuracy: 1)
+        XCTAssertEqual(values.contentModificationDate?.timeIntervalSince1970 ?? 0, modified.timeIntervalSince1970, accuracy: 1)
+    }
+
     func testVerifySizeOnlyAfterCopy_removesDestOnMismatch() async throws {
         let src = tempDir.appendingPathComponent("a.bin")
         let dst = tempDir.appendingPathComponent("b.bin")

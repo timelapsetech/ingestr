@@ -369,22 +369,29 @@ class RenameViewModel: ObservableObject {
         return normalInterval * (percent / 100.0)
     }
     
-    /// Starts a new sequence when a gap differs from typical cadence by ≥ Variation % (faster or slower).
+    /// Starts a new sequence when a gap differs from the *current* sequence's cadence by ≥ Variation %.
+    /// Cadence is recomputed from the open sequence so a later shoot with a different interval is not
+    /// compared against the previous sequence's timing (which would split every frame into Extras).
     func findSequenceBreaks(
         in files: [(url: URL, date: Date)],
-        normalInterval: TimeInterval,
         variationPercent: Int = AutoSplitVariationUserDefaults.defaultPercent
     ) -> [Int] {
         var breaks: [Int] = [0]
-        let allowedDeviation = sequenceSplitAllowedDeviation(
-            for: normalInterval,
-            variationPercent: variationPercent
-        )
+        var sequenceStart = 0
         
         for i in 1..<files.count {
-            let interval = files[i].date.timeIntervalSince(files[i-1].date)
+            let currentSequence = Array(files[sequenceStart..<i])
+            guard let normalInterval = detectNormalInterval(in: currentSequence) else {
+                continue
+            }
+            let allowedDeviation = sequenceSplitAllowedDeviation(
+                for: normalInterval,
+                variationPercent: variationPercent
+            )
+            let interval = files[i].date.timeIntervalSince(files[i - 1].date)
             if abs(interval - normalInterval) >= allowedDeviation {
                 breaks.append(i)
+                sequenceStart = i
             }
         }
         
@@ -552,13 +559,10 @@ class RenameViewModel: ObservableObject {
                         
                         var sequenceBreaks: [Int] = [0]
                         if self.autoSplit {
-                            if let normalInterval = self.detectNormalInterval(in: groupFiles) {
-                                sequenceBreaks = self.findSequenceBreaks(
-                                    in: groupFiles,
-                                    normalInterval: normalInterval,
-                                    variationPercent: self.autoSplitVariationPercent
-                                )
-                            }
+                            sequenceBreaks = self.findSequenceBreaks(
+                                in: groupFiles,
+                                variationPercent: self.autoSplitVariationPercent
+                            )
                         }
                         
                         for i in 0..<sequenceBreaks.count {
